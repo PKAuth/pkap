@@ -1,0 +1,1278 @@
+% TODO: user pandoc to create html
+
+\documentclass{article}
+
+\usepackage{listings}
+\lstset{basicstyle=\ttfamily}
+
+\usepackage{cleveref}
+\usepackage{color}
+\usepackage[margin=1in]{geometry}
+\usepackage[affil-it]{authblk}
+
+\newcommand{\pk}{$\mathcal{PK}$}
+\newcommand{\pki}{$\mathcal{PK}_i$}
+\newcommand{\pks}{\texttt{pks}}
+\newcommand{\ids}{\texttt{id$_s$}}
+\newcommand{\nonce}{\texttt{nonce}}
+\newcommand{\nonces}{\texttt{nonces}}
+\newcommand{\n}{$\mathcal{N}$}
+\newcommand{\challenge}{\texttt{challenge}}
+\newcommand{\signedchallenge}{\texttt{signed\ challenge}}
+\newcommand{\username}{\texttt{username}}
+
+\newcommand{\todo}[1]{\textcolor{red}{#1}}
+
+\newcommand{\idpki}{\texttt{id(\pki)}}
+
+\begin{document}
+
+\title{PKAuth: A Protocol for Public Key Infrastructure and Authentication}
+
+\author{James Parker\thanks{\texttt{jp@pkauth.com}}}
+\affil{PKAuth, LLC}
+
+
+\maketitle
+
+\section{Introduction}
+
+%Passwords are currently the most common authentication method used by web services. 
+%Unfortunately, passwords are inconvenient for users and are usually insecure. 
+%
+%
+%
+%forgetting passwords, password reuse, phishing attacks, weak passwords
+
+
+
+This document defines PKAuth, a federated authentication protocol based on public key cryptography. 
+PKAuth's primary goal is to improve the security and usability of authentication. 
+
+
+%
+%... for individuals and organizations
+%
+%.. organizations can delegate access to its members ...
+%
+%Auxiliary use case .. 
+%.. Other potential use cases include .. secure communication
+%
+%.. use cases ... 
+%
+%.. over existing techniques
+
+
+As an overview, PKAuth works by generating a public key pair for each of an individual's devices. 
+The individual also has a master key, which is used to digitally sign the set of device public keys. 
+The individual then hosts the signed set of public keys online. 
+To authenticate an individual, web services only need to know the individual's master public key and the URL of the signed set. 
+The individual can log in by digitally signing a challenge on any device included in the signed set. 
+
+A group can also delegate access to its members. 
+To do so, it establishes the master public keys and signed set URLs for all of its authorized members. 
+The group then signs this information about its members with the group's master key and hosts the signed member information online. 
+Now authorized members can access the group's resources by digitally signing a challenge to authenticate. 
+
+PKAuth has many practical applications. 
+It allows users to authenticate to websites using public key cryptography. 
+Client-side applications on mobile and desktop can also authenticate their users with PKAuth. 
+In addition, PKAuth can be used alongside the Internet of Things (IoT) to provide access to network resources for a group of users. 
+One more application is that PKAuth's signed sets can contain encryption keys as well, so PKAuth creates an infrastructure for secure communication. 
+
+\subsection{Conventions Used in This Document}
+
+The key words ``MUST", ``MUST NOT", ``REQUIRED", ``SHALL", ``SHALL NOT", ``SHOULD", ``SHOULD NOT", ``RECOMMENDED", ``MAY", and ``OPTIONAL" in this document are to be interpreted as described in RFC 2119 \cite{rfc2119}. 
+
+\section{Algorithms}
+
+PKAuth uses various cryptographic algorithms to perform operations including encryption and authentication. 
+This section describes the algorithms supported, as well as standards to perform tasks like serialization. 
+Multiple precision integers, \texttt{mpint}, are used as defined in RFC 4251 \cite{rfc4251}. % mpint defined in http://www.ietf.org/rfc/rfc4251.txt
+Base64Url, \texttt{base64url}, is used to serialize binary data as defined in RFC 4648 \cite{rfc4648}.  % https://tools.ietf.org/html/rfc4648
+PKAuth Standard Form (PSF) is a standardized serialization format for various objects like public keys, private keys, and digital signatures. 
+PSF will be defined for various objects throughout this section. 
+
+\begin{lstlisting}
+type PKAAlgorithm = String
+\end{lstlisting}
+
+To distinguish different cryptographic algorithms, PKAuth defines unique algorithm identifiers throughout this section. 
+These unique identifiers have type \texttt{PKAAlgorithm}, which is a type alias for strings. 
+
+\begin{lstlisting}
+type PKAIdentifier = String
+
+toIdentifier( data : Data) : PKAIdentifier = 
+    let digest = ripeMD160( sha256( data)) in
+    let checksum = firstFourBytes( sha256( sha256( digest))) in
+    return base58( digest || checksum)
+\end{lstlisting}
+
+There are times when a cryptographic key needs to be identified without revealing the key itself. 
+This identifier has type \texttt{PKAIdentifier}, which is a type alias for strings. 
+To help construct identifiers, we define the function `toIdentifier` above. 
+Functions \texttt{ripeMD160} and \texttt{sha256} respectively are the RIPEMD160 and SHA256 hash algorithms \cite{ripemd160, sha256}. 
+The function \texttt{firstFourBytes} take the first four bytes of input and drops the rest. 
+The function \texttt{base58} encodes binary data using the bitcoin alphabet \cite{base58}. 
+Concatenation is represented by \texttt{||}. 
+\texttt{PKAIdentifier}'s are similar to Bitcoin addresses, and they have checksums to help determine whether an identifier is correct \cite{bitcoinaddress}. 
+
+%\todo{Common}
+%
+%
+%- PKAIdentifier
+%- PKAAlgorithm
+%
+%PSF of binary data is base64url
+%
+%base64url
+
+\subsection{Symmetric Authentication}
+
+\begin{table}
+\begin{center}
+\begin{tabular}{| l | c | l |}
+\hline
+Symmetric Authentication Algorithm & Key Length (bits) & Algorithm Identifier \\ 
+\hline
+HMAC with SHA256 & 256 & sa-hmacsha256 \\
+\hline
+\end{tabular}
+\end{center}
+\caption{Summary of symmetric authentication algorithms.}
+\label{table:symmetric_auth_alg}
+\end{table}
+
+Symmetric authentication is used to verify the integrity of data using a secret key. 
+\Cref{table:symmetric_auth_alg} summarizes the supported algorithms. 
+
+\begin{lstlisting}
+type PKAMacKey = {
+    "key" : MacKey
+  , "algorithm" : PKAAlgorithm
+}
+\end{lstlisting}
+
+\texttt{PKAMacKey} is the record type used to encode symmetric authentication secret keys. 
+The \texttt{algorithm} key states which symmetric authentication algorithm the key corresponds to. 
+The \texttt{key} key is the Base64Url encoding of the PSF encoded secret key, where the PSF encoding is dependent on the algorithm used. 
+% An example JSON encoding of a \texttt{PKAMacKey} is shown \todo{in the following section}. 
+
+\begin{lstlisting}
+type PKAMac a = {
+    "content" : a
+  , "tag" : MacTag
+  , "algorithm" : PKAAlgorithm
+  , "identifier" : PKAIdentifier
+}
+\end{lstlisting}
+
+\texttt{PKAMac a} is the record type used to encode symmetrically authenticated messages. 
+The key \texttt{content} holds the Base64Url encoded message. 
+Any content of type \texttt{a} can be authenticated as long as \texttt{a} is encodable in binary. 
+Unless otherwise specified, this specification's default binary encoding is JSON. 
+The \texttt{tag} key is the Base64Url encoding of the PSF encoded MAC tag, where the PSF encoding is dependent on the algorithm used. 
+The key \texttt{algorithm} is the identifier of the symmetric authentication algorithm used. 
+The key \texttt{identifier} is the unique identifier of the secret key used to authenticate the message. 
+
+When verifying a \texttt{PKAMac}, one MUST verify that the algorithm of the secret key matches the algorithm in the \texttt{PKAMac}, the secret key's identifier matches the identifier in the \texttt{PKAMac}, and the tag is valid. 
+
+\subsubsection{HMAC with SHA256}
+
+HMAC with SHA256 is a cryptographic algorithm used for symmetric authentication \cite{hmacsh256}. 
+The algorithm identifier (\texttt{PKAAlgorithm}) for HMAC with SHA256 is \texttt{"sa-hmacsha256"}. 
+The PSF encoding for HMAC with SHA256 secret keys (\texttt{MacKey}) is simply the 256 bit binary secret key. 
+The PSF encoding for HMAC with SHA256 authentication tags (\texttt{MacTag}) is the 256 bit binary SHA256 output. 
+The secret key identifier (\texttt{PKAIdentifier}) for HMAC with SHA256 is the output of \texttt{toIdentifier} where the input is the PSF encoded secret key. 
+
+\todo{need to worry about endianness?}
+
+\begin{figure}
+\begin{lstlisting}
+{
+    "key":"qzzq7ZEpLCy8akbLuLSpkk0dmVgS_PwMHEQFXZe005Y=",
+    "algorithm":"sa-hmacsha256"
+}
+\end{lstlisting}
+\caption{JSON encoded \texttt{PKAMacKey}.}
+\label{code:pkamackey}
+\end{figure}
+
+\begin{figure}
+\begin{lstlisting}
+{
+    "tag":"CHGpaQxpbsJR5dipozuDPqtaz1Vt3T61MNkoRulRalA=",
+    "identifier":"N2zo2ur8NNbVcT1hpXmSps3vaxUxwuPBp",
+    "content":"eyJ1c2VybmFtZSI6ImpwIiwic2VydmljZV9pZ...",
+    "algorithm":"sa-hmacsha256"
+}
+\end{lstlisting}
+\caption{JSON encoded \texttt{PKAMac PKAChallenge}.}
+\label{code:pkamacchallenge}
+\end{figure}
+
+
+An example JSON encoded \texttt{PKAMacKey} is shown in \Cref{code:pkamackey}. 
+An example JSON encoded \texttt{PKAMac} is shown in \Cref{code:pkamacchallenge}. 
+The authenticated content has type \texttt{PKAChallenge}, which is defined in later sections. 
+
+
+
+\subsection{Symmetric Encryption}
+
+\begin{table}
+\begin{center}
+\begin{tabular}{| l | c | l |}
+\hline
+Symmetric Encryption Algorithm & Key Length (bits) & Algorithm Identifier \\ 
+\hline
+AES GCM & 256 & se-aesgcm256 \\
+\hline
+\end{tabular}
+\end{center}
+\caption{Summary of symmetric encryption algorithms.}
+\label{table:symmetric_auth_alg}
+\end{table}
+
+Symmetric encryption is used to encrypt data using a secret key. \Cref{table:symmetric_enc_alg} summarizes the symmetric encryption algorithms supported by PKAuth. 
+
+\begin{lstlisting}
+type PKAEncSecretKey = {
+    "key" : EncSecretKey
+  , "algorithm": PKAAlgorithm
+}
+\end{lstlisting}
+
+\texttt{PKAEncSecretKey} is the record type used to encode symmetric encryption secret keys. The key \texttt{algorithm} states which symmetric encryption algorithm the secret key corresponds to. The \texttt{key} key is the Base64Url encoding of the PSF encoded secret key, where the PSF encoding is dependent of the algorithm used. 
+
+\begin{lstlisting}
+type PKASymEncrypted a = {
+    "ciphertext" : SymEncrypted a
+  , "identifier" : PKAIdentifier
+  , "algorithm" : PKAAlgorithm
+}
+\end{lstlisting}
+
+\label{type-PKASymEncrypted}
+\texttt{PKASymEncrypted} is the record type used to encode data encrypted using symmetric encryption. The \texttt{ciphertext} key holds the Base64Url encoding of the PSF encoded cipthertext. Any content of type a can be encrypted as long as \texttt{a} is encodable in binary. Unless otherwise specified, this specification's default binary encoding is JSON. The key \texttt{algorithm} states which symmetric encryption algorithm was used. The key \texttt{identifier} is the unique identifier of the secret key used to encrypt the content. 
+
+When decrypting a \texttt{PKASymEncrypted}, one MUST verify that the algorithm in the secret key, \texttt{PKAEncSecretKey}, matches the algorithm in the \texttt{PKASymEncrypted a} and the key's identifier matches the identifier in the \texttt{PKASymEncrypted a}. 
+
+\subsubsection{AES GCM (256)}
+
+AES GCM is a cryptographic algorithm used for symmetric encryption \cite{todo}. 
+Its algorithm identifier (\texttt{PKAAlgorithm}) is \texttt{"se-aesgcm256"}. 
+The PSF encoding for AES GCM secret keys (\texttt{EncSecretKey}) is the 256 bit binary secret key. 
+The PSF encoding for AES GCM ciphertexts (\texttt{SymEncrypted a}) is binary ciphertext as defined by \cite{todo}. 
+The secret key identifier (\texttt{PKAIdentifier}) for AES GCM is the output of \texttt{toIdentifier} where the input is the PSF encoded secret key. 
+
+%\todo{TODO}
+%
+%\begin{figure}
+%\begin{lstlisting}
+%{
+%"ciphertext":
+%"identifier": 
+%"algorithm": 
+%\end{lstlisting}
+%\caption{JSON encoded \texttt{TODO}.}
+%\label{code:TODO}
+%\end{figure}
+
+
+\subsection{Asymmetric Authentication}
+
+Asymmetric authentication algorithms are used to digitally sign data. 
+\Cref{tabel:asymmetric_auth_alg} summarizes the asymmetric authentication algorithms supported by PKAuth. 
+
+\begin{table}
+\begin{center}
+\begin{tabular}{| l | c | l |}
+\hline
+Asymmetric Authentication Algorithm & Public Key Length (bits) & Algorithm Identifier \\ 
+\hline
+ED25519 & 256 & aa-ed25519 \\
+RSA PSS with SHA256 & 2048 & aa-rsa2048pss256 \\ % hashFunction
+\hline
+\end{tabular}
+\caption{Summary of asymmetric authentication algorithms.}
+\label{tabel:asymmetric_auth_alg}
+\end{center}
+\end{table}
+
+
+\begin{lstlisting}
+type PKAAuthPublicKey = {
+    "public_key" : AuthPublicKey
+  , "algorithm" : PKAAlgorithm
+}
+\end{lstlisting}
+
+\texttt{PKAAuthPublicKey} is the record type used to encode asymmetric authentication public keys. 
+The \texttt{algorithm} key states which asymmetric authentication algorithm the key corresponds to. 
+The \texttt{public\_key} key is the Base64Url encoding of the PSF encoded public key, where the PSF encoding is dependent on the algorithm used. 
+
+\begin{lstlisting}
+type PKAAuthPrivateKey = {
+    "private_key" : AuthPrivateKey
+  , "algorithm" : PKAAlgorithm
+}
+\end{lstlisting}
+
+\texttt{PKAAuthPrivateKey} is the record type used to encode asymmetric authentication private keys. 
+The \texttt{algorithm} key states which asymmetric authentication algorithm the key corresponds to. 
+The \texttt{private\_key} key is the Base64Url encoding of the PSF encoded private key, where the PSF encoding is dependent on the algorithm used. 
+
+\begin{lstlisting}
+type PKASigned a = {
+    "content" : a
+  , "signature" : Signature
+  , "algorithm" : PKAAlgorithm
+  , "identifier" : PKAIdentifier
+}
+\end{lstlisting}
+
+\texttt{PKASigned a} is the record type used to encode asymmetrically authenticated messages. 
+The \texttt{content} key holds the Base64Url encoded message. 
+Any content of type \texttt{a} can be digitally signed as long as \texttt{a} is encodable in binary. 
+Unless otherwise specified, this specification's default binary encoding is JSON. 
+The key \texttt{signature} is the Base64Url encoding of the PSF encoded digital signature, which is dependent on the algorithm used.  
+The \texttt{algorithm} key states which asymmetric authentication algorithm the key is for. 
+The key \texttt{identifier} is the unique identifier of the key pair used to sign the content (Corresponding public and private keys always share the same identifier). 
+
+When verifying a \texttt{PKASigned a},  one MUST verify that the algorithm of the public key matches the algorithm in the \texttt{PKASigned a}, the key's identifier matches the identifier in the \texttt{PKAMac}, and the signature is valid. 
+
+\begin{figure}
+\begin{lstlisting}
+{
+    "algorithm":"aa-ed25519",
+    "signature":"GicCpubKVNbbVqOng9_g2_dd-...",
+    "identifier":"54tNxiGsBYMWCjb3rqUUvyTYk4mA62UXS",
+    "content":"eyJ0YWciOiJDSEdwYVF4cGJz..."
+}
+\end{lstlisting}
+\caption{JSON encoded \texttt{PKASigned (PKAMac PKAChallenge)}.}
+\label{code:pkasignedmacchallenge}
+\end{figure}
+
+\subsubsection{ED25519}
+
+% https://blog.mozilla.org/warner/2011/11/29/ed25519-keys/ (wrapper around supercop impl)
+
+ED25519 is one of the cryptographic algorithms used for asymmetric authentication \cite{ed25519}. % https://ed25519.cr.yp.to/ed25519-20110926.pdf
+Its algorithm identifer (\texttt{PKAAlgorithm}) is \texttt{"aa-ed25519"}. 
+The PSF encoding for ED25519 public keys (\texttt{AuthPublicKey}) is the binary \texttt{A} (as defined in \todo{???}). 
+The PSF encoding for ED25519 private keys (\texttt{AuthPrivateKey}) is the binary \texttt{k} concatenated with \texttt{A} (as defined in \todo{???}). 
+Both \texttt{k} and \texttt{A} are 256 bits each. 
+The identifier (\texttt{PKAIdentifier}) for both the public key and the private key is the output of \texttt{toIdentifier} where the input is the PSF encoded public key. 
+The PSF encoded signature for ED25519 is the 256 bit \texttt{R} concatenated with the 256 bit \texttt{S}.
+
+
+
+%\todo{TODO:}
+%- cite reference
+%- alg identifier
+%- public key psf (example too)
+%- private key psf (example too)
+%- signature psf (example too)
+%- toidentifier (priv and pub)
+
+
+
+
+
+
+\subsubsection{RSA PSS with SHA256}
+\label{sec:rsapss}
+
+RSA PSS with SHA256 is a cryptographic algorithm used for asymmetric authentication \cite{rsapsssha256}. 
+Its algorithm identifier (\texttt{PKAAlgorithm}) is \texttt{"aa-rsa2048pss256"}. 
+The PSF encoding for RSA public keys (\texttt{AuthPublicKey}) is the \texttt{mpint} of \texttt{n} and \texttt{e} (as defined in \todo{???}):
+\begin{lstlisting}
+mpint public_n
+mpint public_e
+\end{lstlisting}
+The PSF encoding for RSA private keys (\texttt{AuthPrivateKey}) is the \texttt{mpint} of \texttt{n}, \texttt{e}, \texttt{d}, \texttt{p}, \texttt{q}, \texttt{dP}, \texttt{dQ}, \texttt{qInv} (as defined in \todo{???}): 
+\begin{lstlisting}
+mpint public_n
+mpint public_e
+mpint private_d
+mpint private_p
+mpint private_q
+mpint private_dP
+mpint private_dQ
+mpint private_qInv
+\end{lstlisting}
+The identifier (\texttt{PKAIdentifier}) for both the public key and the private key is the output of \texttt{toIdentifier} where the input is the PSF encoded public key. 
+The PSF encoding for the RSA PSS with SHA256 signature (\texttt{Signature}) is \todo{the binary digital signature}.
+
+% public key normal form (big endian)
+
+\todo{mgf1, salt length, trailer field??}
+
+\subsection{Asymmetric Encryption}
+
+Asymmetric encryption algorithms are used to encrypt messages. 
+\Cref{tabel:asymmetric_enc_alg} summarizes the asymmetric encryption algorithms supported by PKAuth. 
+
+
+\begin{table}
+\begin{center}
+\begin{tabular}{| l | c | l |}
+\hline
+Asymmetric Encryption Algorithm & Public Key Length (bits) & Algorithm Identifier \\ 
+\hline
+RSA OAEP with SHA256 and MGF1 & 2048 & ae-rsa2048oaep256 \\
+\hline
+\end{tabular}
+\caption{Summary of asymmetric encryption algorithms.}
+\label{tabel:asymmetric_enc_alg}
+\end{center}
+\end{table}
+
+\jp{TODO: ae-x25519}
+
+
+\begin{lstlisting}
+type PKAEncPublicKey = {
+    "public_key" : EncPublicKey
+  , "algorithm" : PKAAlgorithm
+}
+\end{lstlisting}
+
+\texttt{PKAEncPublicKey} is the record type used to encode asymmetric encryption public keys. 
+The key \texttt{algorithm} states which asymmetric encryption algorithm the public key corresponds to. 
+The \texttt{public\_key} key is the Base64Url encoding of the PSF encoded public key, where the PSF encoding is dependent on the algorithm used. 
+
+\begin{lstlisting}
+type PKAEncPrivateKey = {
+    "private_key" : EncPrivateKey
+  , "algorithm" : PKAAlgorithm
+}
+\end{lstlisting}
+
+\texttt{PKAEncPrivateKey a} is the record type used to encode asymmetric encryption private keys. 
+The key \texttt{algorithm} states which asymmetric encryption algorithm the private key corresponds to. 
+The \texttt{private\_key} key is the Base64Url encoding of the PSF encoded private key, where the PSF encoding is dependent on the algorithm used. 
+
+\begin{lstlisting}
+type PKAAsymEncryptedKey = {
+    "key" : AsymEncrypted PKAEncSecretKey
+  , "identifier" : PKAIdentifier
+  , "algorithm" : PKAAlgorithm
+}
+
+type PKAAsymEncrypted a = {
+    "symmetric_keys" : [PKAAsymEncryptedKey]
+    "ciphertext" : PKASymEncrypted a
+}
+\end{lstlisting}
+
+Asymmetric encryption is typically limited in the length of messages which can be encrypted. 
+Therefore, PKAuth generates a symmetric secret key which is used to encrypt the message. 
+Then the symmetric secret key is encrypted with each of the asymmetric public keys. 
+\texttt{PKAAsymEncryptedKey} is the record type used to encode the asymmetrically encrypted symmetric secret key. 
+The \texttt{key} key is the Base64Url encoding of the PSF encoded (symmetric key) ciphertext. 
+The key \texttt{algorithm} states which asymmetric encryption algorithm was used. 
+The key \texttt{identifier} is the unique identifier of the key pair used to encrypt the content (Corresponding public and private keys always share the same identifier). 
+
+\texttt{PKAAsymEncrypted a} is the record type that encodes the message ciphertext and the set of encrypted symmetric secret keys. 
+The \texttt{ciphertext} key contains the encrypted message as type \texttt{PKASymEncrypted a} (\Cref{type-PKASymEncrypted}). 
+Any content of type \texttt{a} can be encrypted as long as \texttt{a} is encodable in binary. 
+Unless otherwise specified, this specification's default binary encoding is JSON. 
+The \texttt{symmetric\_keys} key contains the symmetric secret keys as type \texttt{[PKAAsymEncryptedKey]}. 
+
+When decrypting a \texttt{PKAAsymEncryptedKey}, one MUST verify that the algorithm of the public key matches the \texttt{algorithm} % in the \texttt{PKAAsymEncryptedKey} 
+and the key's identifier matches the \texttt{identifier}. 
+% in the \texttt{PKAAsymEncryptedKey}. 
+
+
+
+
+%
+%
+%\begin{lstlisting}
+%type PKAAsymEncrypted a = {
+%    "ciphertext" : AsymEncrypted a
+%  , "identifier" : PKAIdentifier
+%  , "algorithm" : PKAAlgorithm
+%}
+%\end{lstlisting}
+%
+%\texttt{PKAAsymEncrypted} is the record type used to encode data encrypted using asymmetric encryption. 
+%The \texttt{ciphertext} key holds the Base64Url encoding of the PSF encoded ciphertext. 
+%Any content of type \texttt{a} can be encrypted as long as \texttt{a} is encodable in binary. 
+%Unless otherwise specified, this specification's default binary encoding is JSON. 
+%The key \texttt{algorithm} states which asymmetric encryption algorithm was used. 
+%The key \texttt{identifier} is the unique identifier of the key pair used to encrypt the content (Corresponding public and private keys always share the same identifier). 
+%
+%When decrypting a \texttt{PKAAsymEncrypted a}, one MUST verify that the algorithm of the public key matches the algorithm in the \texttt{PKAAsymEncrypted a} and the key's identifier matches the identifier in the \texttt{PKAAsymEncrypted a}. 
+
+
+
+
+
+
+
+
+
+
+\subsubsection{RSA OAEP with SHA256 and MGF1}
+
+RSA OAEP with SHA256 and MGF1 is a cryptographic algorithm used for asymmetric encryption \cite{rsaoaep}. % RFC 2437
+Its algorithm identifier (\texttt{PKAAlgorithm}) is \texttt{"ae-rsa2048oaep256"}. 
+The PSF encodings for RSA public keys (\texttt{EncPublicKey}), private keys (\texttt{EncPublicKey}), and the identifier (\texttt{PKAIdentifier}) for both public and private keys are the same as previously defined in \Cref{sec:rsapss}. 
+The PSF encoding for ciphertexts (\texttt{Encrypted a}) is the \todo{encrypted binary output}. % X || Y? https://en.wikipedia.org/wiki/Optimal_asymmetric_encryption_padding
+
+\todo{encrypting symmetric keys and ciphertexts}
+
+%\todo{TODO:}
+%- cite reference
+%- alg identifier
+%- public key psf (example too)
+%- private key psf (example too)
+%- signature psf (example too)
+%- toidentifier (priv and pub)
+
+
+%\section{JSON Keys}
+%
+%{
+%	"public_key": "base64url encoded( standard form (pk))",
+%	"algorithm": "aa-ed25519"
+%}
+%
+%{
+%	"private_key": "base64url encoded( standard form (pk))",
+%	"algorithm": "aa-ed25519"
+%}
+%
+%\section{JSON Signatures}
+%%
+%%sign :: PrivateKey -> ByteString -> String
+%%sign key msg = 
+%%     let signature = digitally_sign key msg
+%%	let content = base64encode msg
+%%	
+%
+%Signature is for the raw string content (ie not base64url encoded).
+%
+%{
+%	"content": "base64url encoded",
+%	"signature": "base64url signature",
+%	"algorithm": "aa-ed25519",
+%	"identifier": "public_key_id"
+%}
+
+
+\section{Public Key Infrastructure}
+
+PKAuth distributes keys using a recursive, self-signing public key infrastructure. 
+Specifically, a recursive tree structure (with type \texttt{PKASigned PKATree}) grants access to child entities and provides the public keys of entities in the tree. 
+These public keys are used for authentication, encryption, and digital signatures. 
+The recursive tree structure is encoded in JSON with type \texttt{PKASigned PKATree} in a file (with extension \texttt{.pkt} by convention). 
+
+The definition of type \texttt{PKATree} is shown in \Cref{code:pkatree}. 
+\texttt{PKATree} is a record type that consists of keys \texttt{authentication}, \texttt{signature}, \texttt{encryption}, \texttt{children}, \texttt{master}, \texttt{ttl}, \texttt{expiration}, and \texttt{updated}. 
+% sum type of either a parent node in the tree or a leaf node. 
+% The first record in the \texttt{PKATree} type consists of the keys \texttt{children}, \texttt{master}, \texttt{ttl}, \texttt{expiration}, and \texttt{updated}. 
+% This record is for a parent node. 
+\texttt{authentication} indicates the set of public keys that can be used for authentication. 
+\texttt{signature} is the set of public keys that can be used to verify digital signatures. 
+\texttt{encryption} is the set of public keys that can be used for encryption. 
+\texttt{children} indicates a reference to child nodes of the current node along with their meta data. 
+\texttt{master} is the current node's master key. 
+\texttt{ttl} indicates the \emph{time to live} in seconds. 
+\texttt{expiration} is an optional date-time field of when the current node expires. 
+\texttt{updated} is the date-time when the current node was last updated or created. 
+
+%The second record in the \texttt{PKATree} type consists of the keys \texttt{authentication}, \texttt{signature}, \texttt{encryption}, \texttt{master}, \texttt{ttl}, \texttt{expiration}, and \texttt{updated}. 
+%This record is for a leaf node. 
+%\texttt{master}, \texttt{ttl}, \texttt{expiration}, and \texttt{updated} are the same as in the first record. 
+
+Type \texttt{PKAChild} is a record that describes meta data about a child node. 
+\texttt{key} is the master key of the child node. 
+\texttt{location} is URL reference to the child node's JSON encoded \texttt{PKASigned PKATree} (or \texttt{.pkt} file). 
+\texttt{roles} grants additional privileges to the child node. 
+\texttt{depth} is an optional attribute that indicates the maximum depth of the child's tree to limit further delegation. 
+For instance, a \texttt{depth} of 0 means that the child node cannot have children, while a \texttt{depth} of 1 means the child node can have children, but no grandchildren. 
+
+\jp{Support individual keys/groups expiring? For example, guests have access to IOT (door locks, lights, TV, etc) for a set amount of time.}
+
+% When \texttt{true}, \texttt{leaf} indicates that the child node must be a leaf record to prevent further delegation. 
+
+Type \texttt{PKARole} is an enum of strings. 
+The only currently valid strings are \texttt{"admin"}, \texttt{"write"}, and \texttt{"read"}. 
+
+Type \texttt{URL a} is a URL string that references a JSON encoded object of type \texttt{a}. 
+
+% contains a URL reference that 
+%
+%TODO: \texttt{PKARole}, \texttt{URL a}
+
+An example of a JSON encoded \texttt{PKATree} is in \Cref{example:pkatree:tree}. 
+
+% ... \texttt{PKATree} files
+\begin{figure}[h!]
+\begin{lstlisting}
+type PKATree = {
+    "authentication" : [PKAAuthPublicKey]
+  , "signature" : Maybe [PKAAuthPublicKey]
+  , "encryption" : Maybe [PKAEncKey]
+  , "master" : PKAAuthPublicKey
+  , "ttl" : Int
+  , "expiration" : Maybe DateTime
+  , "updated" : DateTime
+  , "children" : Maybe [PKAChild]
+}
+
+type PKAChild = {
+    "key" : PKAAuthPublicKey
+  , "location" : URL (PKASigned PKATree)
+  , "roles" : [PKARole]
+  , "depth" : Maybe Int
+}
+
+type PKARole = "admin" | "write" | "read"
+
+type URL a = String
+\end{lstlisting}
+\caption{Definition of type \texttt{PKATree}.}
+\label{code:pkatree}
+\end{figure}
+% "leaf" : Bool -- TODO: 
+
+%\begin{figure}[h!]
+%\begin{lstlisting}
+%{
+%  "authentication": [
+%    {
+%      "public_key": "_JJ9LujZL7TjIUCoTQFposnQ2t6eozeAoW9A-LjFzAw=",
+%      "algorithm": "aa-ed25519"
+%    }
+%  ],
+%  "signature": [],
+%  "encryption": [],
+%  "master": {
+%    "public_key": "AAABAQCoe6rDgIkHks48j9-TottFftZ...",
+%    "algorithm": "aa-rsa2048pss256"
+%  },
+%  "ttl": 3600,
+%  "expiration": "2017-01-01T01:00:00.000Z",
+%  "updated": "2015-01-01T01:00:00.000Z"
+%}
+%\end{lstlisting}
+%\caption{A \texttt{PKATree} example of a leaf entity.}
+%\label{example:pkatree:leaf}
+%\end{figure}
+
+\begin{figure}[h!]
+\begin{lstlisting}
+{
+  "authentication": [{
+    "public_key": "_JJ9LujZL7TjIUCoTQFposnQ2t6eozeAoW9A-LjFzAw=",
+    "algorithm": "aa-ed25519"
+  }],
+  "signature": [],
+  "encryption": [],
+  "children": [{
+    "key": {
+      "public_key": "AAABAQCoe6rDgIkHks48j9-TottFftZ...",
+      "algorithm": "aa-rsa2048pss256"
+    },
+    "location": "http://domain.name/name.pkt",
+    "roles": ["admin"],
+    "depth": 1
+  }],
+  "master": {
+    "public_key": "7sqbfLVUo9Atr13rrWu5zdkeenlosdHNMJcNdS83V1w=",
+    "algorithm": "aa-ed25519"
+  },
+  "ttl": 3600,
+  "expiration": "2017-01-01T01:00:00.000Z",
+  "updated": "2015-01-01T01:00:00.000Z"
+}
+\end{lstlisting}
+\caption{A JSON encoded \texttt{PKATree}.}
+\label{example:pkatree:tree}
+\end{figure}
+
+
+When parsing a JSON encode \texttt{PKASigned PKATree}, there are a few constraints that MUST be checked. 
+The digital signature of \texttt{PKASigned PKATree} MUST be cryptographically verified. 
+The public key used to sign the \texttt{PKASigned PKATree} MUST equal the \texttt{master} public key in \texttt{PKATree}. 
+For all children in a node, the \texttt{key} MUST equal the public key used to sign the child's \texttt{PKASigned PKATree} at the child's \texttt{location}. 
+A node's \emph{computed roles} MUST be the set intersect of the roles of all of the node's ancestors. 
+A node's \emph{computed expiration} MUST be the earliest expiration of all of the node's ancestors. 
+A node's \emph{computed updated time} MUST be the latest updated time of all of the node's ancestors. 
+If \texttt{depth} is present in any of a node's ancestors, the node's \emph{computed remaining depth} MUST decrement for every subsequent recursive layer in the tree, and it MUST be the minimum of the current remaining depth and the current node's \texttt{depth}. 
+
+Type \texttt{PKALink} (\Cref{code:pkalink}) contains an entity's master public key (\texttt{master\_key}) and a URL reference to the entity's \texttt{.pkt} file (\texttt{location}). 
+By convention, a JSON encoded \texttt{PKALink} file has extension \texttt{.pkl}. 
+
+% \todo{rename PKACredential (in pkauth-haskell)}
+
+\begin{figure}[h!]
+\begin{lstlisting}
+type PKALink = {
+    "location": URL (PKASigned PKATree)
+  , "master_key": PKAAuthPublicKey
+}
+\end{lstlisting}
+\caption{Definition of type \texttt{PKALink}.}
+\label{code:pkalink}
+\end{figure}
+
+% TODO: Describe algorithm??? : set intersect of all roles, earliest expiration, latest updated, leaf
+% PKALink -> [Entities w/ pk's, ttl, expiration, updated, etc]
+
+
+%\section{Public Key Authentication Scheme}
+%
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% TODO: add timestamps with timeouts
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%% TODO: add some pictures/graphics here?
+%
+%
+%% TODO: add csrf, nonce checking???
+%
+%
+%
+%
+%
+%
+%
+%
+%Here we define the PKAuth public key authentication scheme used to perform authentication. 
+%% TODO: place constraints on digital signature scheme used, secure against ___ (according to def in katz' book), throughout this paper, assume __ scheme is used. 
+%Assume that the client has already generated a set of public key pairs, \pk{}. 
+%In addition, the client and service have agreed upon a unique \username{} and the service knows all of the public keys in the client's set of key pairs \texttt{public({\pk{}})}. 
+%The client also knows the service's identity, \ids{}. %public key, \pks{}. 
+%
+%% secure channel
+%
+%To initiate a login request, the client sends the service its \username{} and the unique identifier, \texttt{id(\pki)}, of the public key the client wishes to use. 
+%With this information, the service can retrieve the associated public key, \pki{}. 
+%
+%The service generates a uniformly random \nonce{} from the set of 128 character long strings, \n{}, corresponding to the regular expression \texttt{[A-Z|a-z|0-9]\{128\}}. 
+%The service then sends the client a \challenge{} consisting of the \username{}, the public key identifier \idpki{}, a \texttt{timestamp}, the service's identity \ids{}, and the \nonce{}. 
+%%The service then sends the client a \challenge{} consisting of the \username{}, the public key identifier \idpki{}, the service's identity \pks{}, and the \nonce{}. 
+%
+%Given the \challenge{}, the client now verifies that the \challenge{} is valid by %performing the following checks. 
+%verifying that the \ids{} given in the \challenge{} equals the \ids{} in the client's memory for the given service. 
+%%Verify that the \pks{} given in the \challenge{} equals the \pks{} in the client's memory for the given service. 
+%%Ensure that the \nonce{} received is not equal to any other \nonces{} previously used to authenticate with the service over some specified period of time. 
+%%By default, let this period be 7 days. 
+%% TODO: any more checks??
+%If this check fails, stop the authentication protocol, and restart it by resending the login request. 
+%Otherwise, digitally sign the \challenge{} using the corresponding private key, \texttt{private({\pki{}})}. 
+%Return the \signedchallenge{} back to the service. 
+%
+%The service can now verify the \signedchallenge{} against the client's public key, \texttt{public({\pki{}})}. 
+%It also checks that the \texttt{timestamp} in the \challenge{} is within a specified period of time. 
+%By default this period is one minute. 
+%The service also makes sure the \ids{} given in the \challenge{} matches the service's \challenge{}. 
+%If the signature is verified, the timestamp has not expired, and the \ids{} matches, authenticate the user. 
+%Otherwise, deny the user access. 
+
+\section{PKAuth}
+
+PKAuth is a public key authentication protocol used to authenticate end users. 
+The protocol requires that the client and service MUST establish a secure channel where the service's identity is authenticated. % TODO: define what  a secure channel is?? 
+It also requires that the service's internal clock time MUST be monotonic and have integrity. % TODO: clarify this? 
+In addition, the client and service MUST agree upon a unique \username{} that identifies the client. 
+
+% TODO: scheme here.. 
+
+\subsection{PKAuth for Websites}
+
+While the PKAuth authentication protocol can be used over any secure channel, special considerations must be taken into account when authenticating over \texttt{https} in the browser. 
+In particular, PKAuth compliant websites MUST embed the html header tag \texttt{pkauth}. 
+The \texttt{pkauth} tag MUST always contain the attributes \texttt{href} and \texttt{token}. 
+The \texttt{href} attribute MUST point to a URL on the same domain of the current webpage that will handle PKAuth requests. 
+This URL is referred to as \texttt{authUrl}. 
+The \texttt{token} attribute MUST be a random sequence of characters to prevent CSRF attacks. % TODO: RFC for CSRF tokens??
+If the user is not logged into the website, \texttt{href} and \texttt{token} are the only required attributes. 
+If the user is logged into the website, the \texttt{authenticated} attribute MUST be included where the value is the user's username. 
+% If the website does not know the user's master public key and \texttt{PKASigned PKATree} URL, the \texttt{pkinfo} attribute MUST be included where the value is an empty string (\texttt{""}). 
+If the website knows the user's master public key and \texttt{PKASigned PKATree} URL, the \texttt{pkinfo} attribute MUST be included where the value is the identifier of the user's master public key. \todo{texttt for identifier?}
+%an empty string (\texttt{""}). 
+Examples of \texttt{pkauth} tags are shown in \Cref{example:pkauthtag}. 
+
+\begin{figure}[h!]
+\begin{lstlisting}
+<pkauth href="https://domain.name/pkauth" token="95eYX2IN" />
+<pkauth href="https://domain.name/pkauth" token="95eYX2IN" 
+        authenticated="user63" />
+<pkauth href="https://domain.name/pkauth" token="95eYX2IN" 
+        authenticated="user63" pkinfo="MiD7NiyZrhj4qF69C..." />
+\end{lstlisting}
+\caption{Example \texttt{pkauth} html header tags.}
+\label{example:pkauthtag}
+\end{figure}
+
+% Login
+\subsubsection{Login}
+
+When initiating an authentication request, the client first verifies that the domain of the \texttt{authUrl} is the same as the current website's. 
+It then sends a POST request to the \texttt{authUrl} where the \texttt{verb} key has value \texttt{initiate}, the \texttt{username} is the user's username, and the key \texttt{identifier\_pk} is the \texttt{PKAIdentifier} of the public key to be used for authentication. 
+The key \texttt{tree\_path} is an array of \texttt{PKASigned PKATree} URLs that indicate the path of children in the PKATree to reach the public key to be used for authentication. 
+The \texttt{tree\_path} MUST not include the root \texttt{PKASigned PKATree} URL, and the URLs in the \texttt{tree\_path} MUST equal the URL locations in the tree. 
+An example request is shown in \Cref{fig:init_req}. 
+
+
+\begin{figure}
+\begin{lstlisting}
+verb: initiate
+username: user63
+identifier_pk: 14E2FED8E57F47BCC4D70A90EFCD765C97040F5A
+tree_path: ["http://domain.name/child.pkt"]
+\end{lstlisting}
+\caption{Initiating authentication POST request.}
+\label{fig:init_req}
+\end{figure}
+
+When the service receives the initiate request, it MUST check that the username exists and that the user's public key set contains a public key that matches the identifier. 
+It is a failure if the public key is not in the \texttt{tree\_path} of the PKATree. 
+The service MUST generate a uniformly random nonce with a length of at least 64 bits. 
+The service MUST also get the current time. 
+Using this information, the service MUST create a \texttt{PKAChallenge} (defined in \Cref{code:pkachallenge} and a JSON encoded example is in \Cref{code:pkachallengejson}). 
+The service MUST then authenticate the challenge using a MAC, and the MAC key used SHOULD be unique for each user. 
+The service MUST return the JSON encoded \texttt{PKAMac PKAChallenge} in a \texttt{200 Success} response. 
+An example of a JSON encoded \texttt{PKAMac PKAChallenge} is shown in \Cref{code:pkamacchallenge}. 
+For added security, the service MAY store the nonce internally to protect against replay attacks that occur before the challenge expires. 
+On any failure, the service MUST return a \texttt{404 Not Found} response. 
+\todo{error codes table}
+
+\begin{figure}
+\begin{lstlisting}
+type DomainName = String
+type Nonce = String
+
+type PKAChallenge = {
+    "username": String
+  , "public_key": PKAAuthPublicKey
+  , "timestamp": UTCTime
+  , "service_identifier": DomainName
+  , "nonce": Nonce
+  , "challenge": Maybe ExternalChallenge
+}
+\end{lstlisting}
+\caption{Definition of a \texttt{PKAChallenge}.}
+\label{code:pkachallenge}
+\end{figure}
+
+\todo{JP: Mention optional ExternalChallenge. Defer/reference later section.}
+
+\begin{figure}
+\begin{lstlisting}
+{
+    "username":"user63",
+    "service_identifier":"domain.name",
+    "public_key": {
+        "algorithm":"aa-ed25519",
+        "public_key":"YSwAWjrhYF0Q4QTEZcZczgVd5K..."
+    },
+    "timestamp":"2016-02-18T18:03:47.813Z",
+    "nonce":"TOAIBo5flVq6FvPOjCKNPClWEWa71..."
+}
+\end{lstlisting}
+\caption{JSON encoded \texttt{PKAChallenge}.}
+\label{code:pkachallengejson}
+\end{figure}
+
+%  , "identifier_pk": PKAIdentifier PKAAuthPublicKey
+
+When the client receives the challenge, it MUST check that the \texttt{username} and \texttt{identifier\_pk} in the challenge match what was in the origin request. 
+The client MUST also check that the \texttt{service\_identifier} matches the service's domain name and that the \texttt{timestamp} is within a relatively recent period of time. 
+By default this period is two minutes. 
+If any of these checks fail, the client MAY restart the authentication process by sending another \texttt{initiate} request or MAY stop the authentication attempt. 
+Upon success, the client MAY continue the process by digitally signing the \texttt{PKAMac PKAChallenge}, producing a \texttt{PKASigned (PKAMac PKAChallenge)}. 
+The client provides the service the digitally signed challenge by sending a POST request to the \texttt{authUrl} where key \texttt{verb} has value \texttt{authenticate}, key \texttt{token} is the token provided by the pkauth header, and key \texttt{challenge} is the JSON encoded \texttt{PKASigned (PKAMac PKAChallenge)}. 
+An example of a JSON encoded \texttt{PKASigned (PKAMac PKAChallenge)} is shown in \Cref{code:pkasignedmacchallenge}. 
+An example of the authenticating POST request is shown in \Cref{code:postauthenticate}. 
+
+\todo{JP: Is this token removed now?}
+
+\begin{figure}
+\begin{lstlisting}
+verb: authenticate
+token: 95eYX2IN
+challenge: {
+    "algorithm":"aa-ed25519",
+    "signature":"GicCpubKVNbbVqOng9_g2_dd-...",
+    "identifier":"54tNxiGsBYMWCjb3rqUUvyTYk4mA62UXS",
+    "content":"eyJ0YWciOiJDSEdwYVF4cGJz..."
+}
+\end{lstlisting}
+\caption{An example authenticating POST request.}
+\label{code:postauthenticate}
+\end{figure}
+
+When the service receives the \texttt{authenticate} request, it MUST check that the username exists and that the public key used to sign the challenge belongs to the user being authenticated. 
+The service MUST also check that the \texttt{service\_identifier} matches the service's domain name. 
+The service MUST check that the \texttt{timestamp} is within a relatively recent period of time. 
+By default this period is two minutes. 
+If the service previously stored nonce internally, the service MUST check that the nonce for that user is equal, and it MUST revoke the given nonce. 
+The service MUST verify the MAC integrity of the challenge (\texttt{PKAMac PKAChallenge}). 
+The service MUST verify the integrity of the digitally signed challenge (\texttt{PKASigned (PKAMac PKAChallenge)}). 
+On any failure, the service MUST return a \texttt{404 Not Found} response. 
+Otherwise, the client’s identity is now confirmed so the service can authorize the user as usual. 
+Typically, this involves setting browser cookies and redirecting the client. 
+The service MAY redirect the client using JSON as shown in \Cref{fig:logout_redirect}. 
+
+% TODO: establish PKInfo, traverse PKLinks??
+
+% Logout
+\subsubsection{Logout}
+
+When the client wishes to logout, it checks the domain of the \texttt{authUrl}. 
+Then the client sends the service an AJAX POST request where the \texttt{verb} key is \texttt{logout} and the \texttt{token} key is the token provided by the \texttt{pkauth} html header tag. 
+\Cref{fig:logout_req} shows an example of this. 
+After verifying the token, the service can log out the client as usual. 
+Typically the service does this by revoking browser cookies and redirecting. 
+The service MAY indicate a browser redirect to the client over AJAX by returning JSON as shown in \Cref{fig:logout_redirect}. 
+
+\todo{Should this be defined as a type? Require "success"? Consider including "extra" key for Applications.}
+
+\begin{figure}
+\begin{lstlisting}
+verb: logout
+token: 95eYX2IN
+\end{lstlisting}
+\caption{An example of a logout AJAX POST request.}
+\label{fig:logout_req}
+\end{figure}
+
+\begin{figure}
+\begin{lstlisting}
+{
+    "success" : true,
+    "redirect" : "https://domain.name"
+}
+\end{lstlisting}
+\caption{A successful AJAX response indicating a browser redirect.}
+\label{fig:logout_redirect}
+\end{figure}
+
+
+% Share pkinfo
+\subsubsection{Establish Public Key Information}
+
+When the user is logged in and the service does not know the user's master public key, the \texttt{pkauth} tag includes the \texttt{pkinfo} attribute. 
+In this circumstance, the client MAY establish the user's master public key and \texttt{PKASigned PKATree} URL with the service. 
+The client does this by first verifying the domain of \texttt{authUrl}.
+It then sends an AJAX POST request to \texttt{authUrl} where the \texttt{verb} key is the constant \texttt{pkinfo}, the \texttt{token} key is the CSRF token, the \texttt{username} key is the user's username, the \texttt{pkurl} key is the user's \texttt{PKASigned PKATree} URL, and the \texttt{pkmaster} key is the user's master public key. 
+% and the \texttt{pkinfo} key is the user's JSON encoded \texttt{PKALink}. 
+An example is shown in \Cref{example:establish:pkinfo}. 
+
+\begin{figure}
+\begin{lstlisting}
+verb: pkinfo
+token: 95eYX2IN
+username: user63
+pkurl: http://domain.name/name.pkt
+pkmaster: {
+  "public_key": "AAABAQCoe6rDgIkHks48j9-TottFftZ...",
+  "algorithm": "aa-rsa2048pss256"
+}
+\end{lstlisting}
+\caption{An example AJAX POST request to establish a user's public key information.}
+\label{example:establish:pkinfo}
+\end{figure}
+
+The service MUST handle the \texttt{pkinfo} verb to associate the received public key information with the given user, and it MUST verify the CSRF token. 
+The service SHOULD take precautions when authorizing public key information to access a user's account (similar to those taken when users edit their passwords). 
+For example, confirmation emails could be sent to users or users could be redirected to a page where users needs to enter their passwords to approve the new public key information. 
+The service MAY redirect the client using JSON as shown previously in \Cref{fig:logout_redirect}. 
+The public key information MUST NOT be transported via GET variables. 
+
+% \todo{merge children into PKATree (check impl)}
+% \todo{change leaf to depth in PKATree (and in impl)}
+
+% TODO: what if there currently is no account? User registration?? 
+
+% TODO: Other pki like AD or redhat? XXXs
+
+
+\subsection{PKAuth for Applications}
+
+\todo{implement this}
+
+PKAuth supports authentication for non-browser client side applications. 
+To establish a token, the client sends a POST request to the \texttt{authUrl} where the \texttt{verb} key has value \texttt{token}. 
+The web service responds with a JSON encoded token (\Cref{fig:token_response}). 
+The server creates and sets the token if necessary. 
+
+\begin{figure}[h]
+\begin{lstlisting}
+{
+    "token" : "95eYX2IN"
+}
+\end{lstlisting}
+\caption{A successful POST response with the token.}
+\label{fig:token_response}
+\end{figure}
+
+With a token, the client can authenticate as usual. 
+The web service might need to provide additional information to the client upon successful authentication. 
+It can do so by providing any valid JSON value for the key \texttt{extra} in the successful authentication JSON response. 
+An example is shown in \Cref{fig:extra_response}.
+
+\begin{figure}[h]
+\begin{lstlisting}
+{
+    "success" : true,
+    "extra" : {
+        "key1" : "...",
+        "key2" : [1,2,3],
+        "key3" : false
+    }
+}
+\end{lstlisting}
+\caption{A successful JSON authentication response with additional information returned for the \texttt{extra} key.}
+\label{fig:extra_response}
+\end{figure}
+
+% \todo{Return session passes?}
+
+%\todo{add 'method' to initiate?}
+%- enum w/ "redirect" | "session"
+%
+%
+%.. client
+%
+% Desktop/mobile applications
+
+\subsection{External Authentication}
+
+\todo{JP: Don't know if this should be included since it reopens the possibility for phishing attacks.}
+
+There are times when users need to authenticate on devices that are not approved in their \texttt{PKATree}. 
+To support this functionality, PKAuth supports \emph{External Authentication}. 
+
+\todo{JP: Mention something about sqrl?}
+
+\subsubsection{Login}
+\label{ss:login}
+
+To start the login process for \emph{External Authentication}, the external client generates two random 256 bit integers, an \texttt{id} and a \texttt{secret}. 
+It then computes \texttt{challenge} which is the \texttt{sha256} hash of \texttt{secret}. 
+Now the external client generates a QR code encoding a URL pointing to the \texttt{authUrl} with scheme \texttt{pkexternal}. 
+The GET key \texttt{i} is the Base64Url encoded \texttt{id} and the \texttt{c} key is the Base64Url encoded \texttt{challenge}.
+Here is an example. 
+
+%\begin{figure}
+%\begin{lstlisting}
+%pkexternal:// || authUrl || /i?= || base64Url(id) 
+%    || &c= || base64Url( challenge)
+%\end{lstlisting}
+%\caption{}
+%\label{}
+%\end{figure}
+
+%\begin{figure}
+\begin{lstlisting}
+pkexternal://domain.name/pkauth?i=MzJzZHNkZ&c=mFmMjNpdWFzZ
+\end{lstlisting}
+%\caption{}
+%\label{}
+%\end{figure}
+
+% \todo{GET token?}
+
+The external client presents the QR code to the user, which the user can scan with an approved device. 
+After parsing the QR code, the approved device SHOULD prompt the user to check that the domain name of the \texttt{authURL} matches the domain name on the external device. 
+The approved device can then authenticate as described in \Cref{ss:login}, except with a few differences. 
+In the initial POST request (previously shown in \Cref{fig:init_req}), the POST key \texttt{external} now contains a JSON encoded \texttt{ExternalChallenge}. 
+
+\begin{lstlisting}
+type ExternalChallenge = {
+    "identifier" : String
+  , "challenge" : String
+}
+\end{lstlisting}
+
+If the web service supports \emph{External Authentication}, the returned PKAChallenge MUST include the provided \texttt{ExternalChallenge}. 
+\todo{Otherwise, the web service MUST return a \texttt{404 Not Found} response.} % JP: What error code???
+The approved device MUST verify that the returned \texttt{ExternalChallenge} equals the original sent. 
+It can then authenticate as usual. 
+Once the web service authenticates the signed \texttt{PKASigned (PKAMac PKAChallenge)}, it should record the \texttt{timestamp} and \texttt{ExternalChallenge}. 
+
+Meanwhile, the external device should periodically send a POST request to the \texttt{authUrl}. 
+The rate of requests MUST be limited to at most two requests per second. 
+In this request, the \texttt{verb} key has value \texttt{external}, the \texttt{identifier} key is the Base64Url encoded \texttt{id}, and the \texttt{secret} key is the Base64Url encoded \texttt{secret}. 
+When the web service receives the request, it MUST verify that the \texttt{id} equals one it has previously authenticated and that the \texttt{secret} equals the SHA256 hash of the accompanying \texttt{challenge}. 
+If not, the web service MUST return a \todo{\texttt{404 Not Found}} response, and the external device can try authenticating again.
+The web service MUST also check that the \texttt{timestamp} has not expired, returning a \todo{\texttt{410 Gone}} response if it has. 
+Upon success, the web service can authenticate the device with a \texttt{200 OK} response. \todo{Should we add an example here as well? Redirects, or "extra"?}
+For web browsers, actions performed by the external client can be done via javascript provided by the web service. 
+
+\todo{implement this?}
+
+
+
+
+
+
+\todo{Other considerations: Constant time equality checks}
+
+\todo{What about the token??}
+
+
+
+
+
+
+
+%\begin{lstlisting}
+%type ExternalSecret = {
+%    "identifier" : String
+%  , "secret" : String
+%}
+%\end{lstlisting}
+
+
+
+\subsubsection{Limitations}
+
+One large limitation with \emph{External Authentication} is that phishing attacks are now possible. 
+Another limitation is that users must trust the external device with the authenticated session. 
+Due to these limitations, users or web services can choose to disable \emph{External Authentication}. 
+A user can disable \emph{External Authentication} by setting the key \texttt{external} to \texttt{false} at any node in their \texttt{PKATree}. 
+Web services can disable \emph{External Authentication} by not supporting it at their \texttt{authUrl} endpoint. 
+Web services could also choose to enable \emph{External Authentication}, but reduced privileges of the authenticated session. 
+For instance, users authenticated via \emph{External Authentication} might not have permission to edit their profile or security settings while using an external device. 
+
+
+
+
+
+
+
+
+
+
+%
+%\section{Old}
+%
+%
+%
+%Previously, we defined the scheme of how to perform authentication with public keys. 
+%Now we incorporate this scheme to develop a protocol that performs public key authentication via websites. 
+%By default, this protocol uses RSA-PSS with SHA256 and 2048 bit keys for digital signing. 
+%
+%Websites that are compliant with this protocol embed the html header tag \texttt{pkauth}, which contains a \texttt{href} attribute. 
+%\begin{lstlisting}
+%<pkauth href="https://domain.name/pkauth">
+%\end{lstlisting}
+%The \texttt{href} attribute gives the url that performs the authentication. 
+%We refer to this url as the \texttt{authUrl}.
+%The domain of this url must be the same as the current page's domain. 
+%% TODO: talk about requiring https, server certificate??
+%There is also an optional attribute \texttt{authenticated} which tells the client that it is currently logged in and authenticated. 
+%The optional \texttt{addKeyRef} attribute provides a link to a page where users can associate public keys with their accounts. 
+%Webpages can also include the optional attributes \texttt{publicKeyAF} and \texttt{fingerprintAF} to request that the client autofill form fields on the page with the user's public key and fingerprint. 
+%\begin{lstlisting}
+%<pkauth href="https://domain.name/pkauth"
+%    authenticated="user63"
+%    addKeyRef="http://domain.name/addKey"
+%    publicKeyAF="fieldId1"
+%    fingerprintAF="fieldId2">
+%\end{lstlisting}
+%%  TODO: Give the username also? Does the service providing the username create a security risk? It could trick the browser extension to show that the user is logged in incorrectly. Maybe this is ok though... because websites already do this within the page layout. 
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% TODO:
+%% 	add send public key verb?? used to add pk to user's already logged in
+%%		called "pkinfo"
+%% 	add request command? fill in form w/ public key, or send to server??
+%% 	add protocol name: "rsa-pss-2048-sha256"
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%\subsection{Login}
+%
+%When the client wishes to initiate an authentication, it first checks that the domain of the \texttt{authUrl} is the same as the current web site's. 
+%If the check fails, an error is thrown, indicating that the website is not compliant with the protocol. 
+%Otherwise, the client sends an initiation POST request to the \texttt{authUrl} via AJAX. 
+%% TODO: ajax only? or redirects ok too...?
+%This request should contain all of the following keys and values. 
+%The key \texttt{verb} with the value \texttt{initiate}. 
+%The key \texttt{username} should specify the username that the client wants to authenticate as. 
+%The key \texttt{identifier\_pk} should indicate which public key the client wants to use for authentication. 
+%This identifier should be the public key's \texttt{SHA256} fingerprint. 
+%% TODO: indicate hash function. sha1, sha256, sha3??
+%An example request is shown in \Cref{fig:init_req}. 
+%
+%
+%When the service receives the initiate request, it checks that the username exists and that the user's public key set contains a public key with a fingerprint that matches the identifier. 
+%If either of these checks fail, return a \texttt{404 Not Found} error.  
+%% TODO: specify json to return on error??
+%Otherwise, randomly generate a \nonce{} by uniformly sampling from \n{}. 
+%Let \ids{} be the service's domain name. 
+%Return the challenge as a JSON object to the client, containing the \texttt{username}, the public key identifier (\idpki{}), a \texttt{timestamp}, the service identity (\ids{}), and the \nonce{}. 
+%An example challenge is shown in \Cref{fig:challenge}. 
+%
+%\begin{figure}
+%\begin{lstlisting}
+%{
+%  "username":"user63",
+%  "identifier_pk":"14E2FED8E57F47BCC4D70A90EFCD765C97040F5A",
+%  "timestamp":"1395535430943",
+%  "identity_s":"domain.name",
+%  "nonce":"f2V96338373Af7x27y2476Q3738B396G986293b929997..."
+%}
+%\end{lstlisting}
+%%TODO: add "scheme":"rsa-pkcs-2.1-2048", maybe not...
+%\caption{The challenge provided by the service as a JSON object.}
+%\label{fig:challenge}
+%\end{figure}
+%
+%Given the challenge JSON object, the client ensures that the \texttt{username} and the \idpki{} match what was sent in the original request. 
+%In addition, it checks that the domain name matches that of the actual webpage. 
+%The final check is that the given \nonce{} has not been seen for the current service within some specified period of time. 
+%This period is 7 days by default. 
+%If any of these checks fail, the client can decide whether to restart the protocol by sending an initiation request again, or it can simply end the authentication attempt. 
+%Otherwise, the client digitally signs the original JSON string to produce the \signedchallenge{}, which is Base64 encoded. 
+%It then returns the \signedchallenge{} and the given JSON string back to the service by sending another AJAX POST request. 
+%This time, the \texttt{verb} key should have the value \texttt{authenticate}. 
+%See \Cref{fig:auth_req} for an example. 
+%
+%\begin{figure}
+%\begin{lstlisting}
+%verb: authenticate
+%challenge: {
+%  "username":"user63",
+%  "identifier_pk":"14E2FED8E57F47BCC4D70A90EFCD765C97040F5A",
+%  "timestamp":"1395535430943",
+%  "identity_s":"domain.name",
+%  "nonce":"f2V96338373Af7x27y2476Q3738B396G986293b929997..."
+%}
+%signature: "&A$}3:]2A9i]oh<e%?RM(Wdmh=H3zL>6d=RM}<;2*{.w..."
+%\end{lstlisting}
+%\caption{An example of a client's authenticate AJAX POST request.}
+%\label{fig:auth_req}
+%\end{figure}
+%
+%When the service receives an authentication request, it performs a series of checks and returns a \texttt{404 Not Found} if any of the checks fail. 
+%The service first verifies that the key used to sign the challenge belongs to the user being authenticated. 
+%It then checks that the domain provided matches that of the service. 
+%Next, it verifies that the \texttt{timestamp} has not expired. 
+%The service then verifies that the signature is valid for the given challenge and the user's public key (\pki{}). 
+%Otherwise, the client's identity is now confirmed so the service can authenticate the user as usual. 
+%Typically, this involves setting browser cookies and redirecting the client. 
+%
+%% TODO: html tag pkauth, href="https://..." or 
+
+%Error codes:
+%
+%code + Description
+
+% Note: do these reveal too much info?
+
+
+\end{document}
