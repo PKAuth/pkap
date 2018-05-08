@@ -1,3 +1,5 @@
+% Copyright 2018 PKAuth, LLC
+% 
 % TODO: user pandoc to create html
 
 \documentclass{article}
@@ -20,14 +22,18 @@
 \newcommand{\challenge}{\texttt{challenge}}
 \newcommand{\signedchallenge}{\texttt{signed\ challenge}}
 \newcommand{\username}{\texttt{username}}
+\newcommand{\pkap}{PKAP}
+\newcommand{\pkaplong}{Public Key Authentication Protocol}
 
+\newcommand{\jp}[1]{\textcolor{blue}{JP: #1}}
 \newcommand{\todo}[1]{\textcolor{red}{#1}}
 
 \newcommand{\idpki}{\texttt{id(\pki)}}
 
 \begin{document}
 
-\title{PKAuth: A Protocol for Public Key Infrastructure and Authentication}
+% \title{PKAuth: A Protocol for Public Key Infrastructure and Authentication}
+\title{\pkap: \pkaplong}
 
 \author{James Parker\thanks{\texttt{jp@pkauth.com}}}
 \affil{PKAuth, LLC}
@@ -46,8 +52,9 @@
 
 
 
-This document defines PKAuth, a federated authentication protocol based on public key cryptography. 
-PKAuth's primary goal is to improve the security and usability of authentication. 
+This document defines \pkaplong{} (\pkap{}), a federated authentication protocol based on public key cryptography. 
+\pkap{} provides 1) a standard for establishing cryptographic identities and 2) a protocol that authenticates users with web services via their cryptographic identities. 
+\pkap{}'s primary goal is to improve the security and usability of authentication. 
 
 
 %
@@ -63,28 +70,46 @@ PKAuth's primary goal is to improve the security and usability of authentication
 %.. over existing techniques
 
 
-As an overview, PKAuth works by generating a public key pair for each of an individual's devices. 
-The individual also has a master key, which is used to digitally sign the set of device public keys. 
-The individual then hosts the signed set of public keys online. 
+To create a cryptographic identity, an individual generates public key pairs for each device and securely stores the corresponding private keys. 
+The individual then generates a special key pair called the master key, which is used to digitally sign the set of device public keys. 
+% As an overview, PKAuth works by generating a public key pair for each of an individual's devices. 
+% The individual also has a master key, which is used to digitally sign the set of device public keys. 
+To share the newly created cryptographic identity, the individual hosts the signed set of public keys online. 
+% The individual then hosts the signed set of public keys online. 
 To authenticate an individual, web services only need to know the individual's master public key and the URL of the signed set. 
 The individual can log in by digitally signing a challenge on any device included in the signed set. 
 
-A group can also delegate access to its members. 
-To do so, it establishes the master public keys and signed set URLs for all of its authorized members. 
-The group then signs this information about its members with the group's master key and hosts the signed member information online. 
-Now authorized members can access the group's resources by digitally signing a challenge to authenticate. 
+Cryptographic identities can delegate access to other (child) cryptographic identities by referencing the child's URL and master public key. 
+This enables groups or organizations to grant access to its members. 
+For example, an employer may want to authorize its employees to unlock an office's \pkap{} enabled smart lock. 
+The employer creates its cryptographic identity with references to the authorized employee's cryptographic identities. 
+Now any authorized employee can authenticate with the smart lock and unlock the office door. 
+If an employee retires, revocation is simple. 
+The employer removes the retiree from the organization's cryptographic identity, and the retiree no longer has access. 
+%A group can also delegate access to its members. 
+%To do so, it establishes the master public keys and signed set URLs for all of its authorized members. 
+%The group then signs this information about its members with the group's master key and hosts the signed member information online. 
+%Now authorized members can access the group's resources by digitally signing a challenge to authenticate. 
 
-PKAuth has many practical applications. 
-It allows users to authenticate to websites using public key cryptography. 
-Client-side applications on mobile and desktop can also authenticate their users with PKAuth. 
-In addition, PKAuth can be used alongside the Internet of Things (IoT) to provide access to network resources for a group of users. 
-One more application is that PKAuth's signed sets can contain encryption keys as well, so PKAuth creates an infrastructure for secure communication. 
+\pkap{} has many practical applications in addition to allowing users to authenticate to websites using public key cryptography. 
+Client-side applications on mobile and desktop can authenticate their users with \pkap{}. 
+\pkap{} can be used alongside the Internet of Things (IoT) to provide access to network resources for groups of users. 
+\pkap{}'s signed sets contain encryption keys as well, so contacts can securely communicate via end-to-end encryption. 
+% One more application is that PKAuth's signed sets can contain encryption keys as well, so PKAuth creates an infrastructure for secure communication. 
+
+% \todo{benefits... simple revocation, additional authorization}
+
+\todo{Section \ref{sec:algorithms} provides standardized encoding format for various cryptographic ... signed sets... authentication API}
+
+Section \ref{sec:algorithms} defines standardized encoding format for cryptographic algorithms used by \pkap{}. 
+\todo{Section \ref{sec:identities} }
 
 \subsection{Conventions Used in This Document}
 
 The key words ``MUST", ``MUST NOT", ``REQUIRED", ``SHALL", ``SHALL NOT", ``SHOULD", ``SHOULD NOT", ``RECOMMENDED", ``MAY", and ``OPTIONAL" in this document are to be interpreted as described in RFC 2119 \cite{rfc2119}. 
 
 \section{Algorithms}
+\label{sec:algorithms}
 
 PKAuth uses various cryptographic algorithms to perform operations including encryption and authentication. 
 This section describes the algorithms supported, as well as standards to perform tasks like serialization. 
@@ -566,9 +591,12 @@ The PSF encoding for ciphertexts (\texttt{Encrypted a}) is the \todo{encrypted b
 %}
 
 
-\section{Public Key Infrastructure}
+\section{Cryptographic Identities}
+\label{sec:identities}
 
-PKAuth distributes keys using a recursive, self-signing public key infrastructure. 
+\todo{update text to mention identities}
+
+\pkap{} distributes keys using a recursive, self-signing public key infrastructure. 
 Specifically, a recursive tree structure (with type \texttt{PKASigned PKATree}) grants access to child entities and provides the public keys of entities in the tree. 
 These public keys are used for authentication, encryption, and digital signatures. 
 The recursive tree structure is encoded in JSON with type \texttt{PKASigned PKATree} in a file (with extension \texttt{.pkt} by convention). 
@@ -590,6 +618,8 @@ The definition of type \texttt{PKATree} is shown in \Cref{code:pkatree}.
 %The second record in the \texttt{PKATree} type consists of the keys \texttt{authentication}, \texttt{signature}, \texttt{encryption}, \texttt{master}, \texttt{ttl}, \texttt{expiration}, and \texttt{updated}. 
 %This record is for a leaf node. 
 %\texttt{master}, \texttt{ttl}, \texttt{expiration}, and \texttt{updated} are the same as in the first record. 
+
+\todo{Add expiration to PKAChild?}
 
 Type \texttt{PKAChild} is a record that describes meta data about a child node. 
 \texttt{key} is the master key of the child node. 
