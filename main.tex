@@ -37,6 +37,7 @@
 
 \author{James Parker\thanks{\texttt{jp@pkauth.com}}}
 \affil{PKAuth, LLC}
+\date{\today\\ \ \\ v0.0}
 
 
 \maketitle
@@ -82,7 +83,7 @@ The individual can log in by digitally signing a challenge on any device include
 Cryptographic identities can delegate access to other (child) cryptographic identities by referencing the child's URL and master public key. 
 This enables groups or organizations to grant access to its members. 
 For example, an employer may want to authorize its employees to unlock an office's \pkap{} enabled smart lock. 
-The employer creates its cryptographic identity with references to the authorized employee's cryptographic identities. 
+The employer creates its cryptographic identity with references to the authorized employees' cryptographic identities. 
 Now any authorized employee can authenticate with the smart lock and unlock the office door. 
 If an employee retires, revocation is simple. 
 The employer removes the retiree from the organization's cryptographic identity, and the retiree no longer has access. 
@@ -99,10 +100,12 @@ Client-side applications on mobile and desktop can authenticate their users with
 
 % \todo{benefits... simple revocation, additional authorization}
 
-\todo{Section \ref{sec:algorithms} provides standardized encoding format for various cryptographic ... signed sets... authentication API}
+% \todo{Section \ref{sec:algorithms} provides standardized encoding format for various cryptographic ... signed sets... authentication API}
 
-Section \ref{sec:algorithms} defines standardized encoding format for cryptographic algorithms used by \pkap{}. 
-\todo{Section \ref{sec:identities} }
+The rest of this document describes \pkap{}'s standards and protocol in detail. 
+Section \ref{sec:algorithms} defines a standardized encoding format for the cryptographic algorithms used by \pkap{}. 
+Section \ref{sec:identities} defines how cryptographic identities are encoded. 
+Section \ref{sec:pkap} details how \pkap{} clients and servers interact to authenticate users and share cryptographic identities. 
 
 \subsection{Conventions Used in This Document}
 
@@ -111,18 +114,18 @@ The key words ``MUST", ``MUST NOT", ``REQUIRED", ``SHALL", ``SHALL NOT", ``SHOUL
 \section{Algorithms}
 \label{sec:algorithms}
 
-PKAuth uses various cryptographic algorithms to perform operations including encryption and authentication. 
+\pkap{} uses various cryptographic algorithms to perform operations including encryption and authentication. 
 This section describes the algorithms supported, as well as standards to perform tasks like serialization. 
 Multiple precision integers, \texttt{mpint}, are used as defined in RFC 4251 \cite{rfc4251}. % mpint defined in http://www.ietf.org/rfc/rfc4251.txt
 Base64Url, \texttt{base64url}, is used to serialize binary data as defined in RFC 4648 \cite{rfc4648}.  % https://tools.ietf.org/html/rfc4648
-PKAuth Standard Form (PSF) is a standardized serialization format for various objects like public keys, private keys, and digital signatures. 
+\pkap{} Standard Form (PSF) is a standardized serialization format for various objects like public keys, private keys, and digital signatures. 
 PSF will be defined for various objects throughout this section. 
 
 \begin{lstlisting}
 type PKAAlgorithm = String
 \end{lstlisting}
 
-To distinguish different cryptographic algorithms, PKAuth defines unique algorithm identifiers throughout this section. 
+To distinguish different cryptographic algorithms, \pkap{} defines unique algorithm identifiers throughout this section. 
 These unique identifiers have type \texttt{PKAAlgorithm}, which is a type alias for strings. 
 
 \begin{lstlisting}
@@ -260,7 +263,7 @@ AES GCM & 256 & se-aesgcm256 \\
 \label{table:symmetric_auth_alg}
 \end{table}
 
-Symmetric encryption is used to encrypt data using a secret key. \Cref{table:symmetric_enc_alg} summarizes the symmetric encryption algorithms supported by PKAuth. 
+Symmetric encryption is used to encrypt data using a secret key. \Cref{table:symmetric_enc_alg} summarizes the symmetric encryption algorithms supported by \pkap{}. 
 
 \begin{lstlisting}
 type PKAEncSecretKey = {
@@ -309,7 +312,7 @@ The secret key identifier (\texttt{PKAIdentifier}) for AES GCM is the output of 
 \subsection{Asymmetric Authentication}
 
 Asymmetric authentication algorithms are used to digitally sign data. 
-\Cref{tabel:asymmetric_auth_alg} summarizes the asymmetric authentication algorithms supported by PKAuth. 
+\Cref{tabel:asymmetric_auth_alg} summarizes the asymmetric authentication algorithms supported by \pkap{}. 
 
 \begin{table}
 \begin{center}
@@ -439,7 +442,7 @@ The PSF encoding for the RSA PSS with SHA256 signature (\texttt{Signature}) is \
 \subsection{Asymmetric Encryption}
 
 Asymmetric encryption algorithms are used to encrypt messages. 
-\Cref{tabel:asymmetric_enc_alg} summarizes the asymmetric encryption algorithms supported by PKAuth. 
+\Cref{tabel:asymmetric_enc_alg} summarizes the asymmetric encryption algorithms supported by \pkap{}. 
 
 
 \begin{table}
@@ -495,7 +498,7 @@ type PKAAsymEncrypted a = {
 \end{lstlisting}
 
 Asymmetric encryption is typically limited in the length of messages which can be encrypted. 
-Therefore, PKAuth generates a symmetric secret key which is used to encrypt the message. 
+Therefore, \pkap{} generates a symmetric secret key which is used to encrypt the message. 
 Then the symmetric secret key is encrypted with each of the asymmetric public keys. 
 \texttt{PKAAsymEncryptedKey} is the record type used to encode the asymmetrically encrypted symmetric secret key. 
 The \texttt{key} key is the Base64Url encoding of the PSF encoded (symmetric key) ciphertext. 
@@ -633,7 +636,7 @@ For instance, a \texttt{depth} of 0 means that the child node cannot have childr
 % When \texttt{true}, \texttt{leaf} indicates that the child node must be a leaf record to prevent further delegation. 
 
 Type \texttt{PKARole} is an enum of strings. 
-The only currently valid strings are \texttt{"admin"}, \texttt{"write"}, and \texttt{"read"}. 
+The only currently valid strings are \texttt{"admin"}, \texttt{"auth"}, \texttt{"write"}, and \texttt{"read"}. 
 
 Type \texttt{URL a} is a URL string that references a JSON encoded object of type \texttt{a}. 
 
@@ -741,7 +744,7 @@ If \texttt{depth} is present in any of a node's ancestors, the node's \emph{comp
 Type \texttt{PKALink} (\Cref{code:pkalink}) contains an entity's master public key (\texttt{master\_key}) and a URL reference to the entity's \texttt{.pkt} file (\texttt{location}). 
 By convention, a JSON encoded \texttt{PKALink} file has extension \texttt{.pkl}. 
 
-% \todo{rename PKACredential (in pkauth-haskell)}
+% \todo{rename PKACredential (in \pkap{}-haskell)}
 
 \begin{figure}[h!]
 \begin{lstlisting}
@@ -777,7 +780,7 @@ type PKALink = {
 %
 %
 %
-%Here we define the PKAuth public key authentication scheme used to perform authentication. 
+%Here we define the \pkap{} public key authentication scheme used to perform authentication. 
 %% TODO: place constraints on digital signature scheme used, secure against ___ (according to def in katz' book), throughout this paper, assume __ scheme is used. 
 %Assume that the client has already generated a set of public key pairs, \pk{}. 
 %In addition, the client and service have agreed upon a unique \username{} and the service knows all of the public keys in the client's set of key pairs \texttt{public({\pk{}})}. 
@@ -809,21 +812,24 @@ type PKALink = {
 %If the signature is verified, the timestamp has not expired, and the \ids{} matches, authenticate the user. 
 %Otherwise, deny the user access. 
 
-\section{PKAuth}
+\section{\pkap{} API}
+\label{sec:pkap}
 
-PKAuth is a public key authentication protocol used to authenticate end users. 
+\todo{Update...}
+
+\pkap{} is a public key authentication protocol used to authenticate end users. 
 The protocol requires that the client and service MUST establish a secure channel where the service's identity is authenticated. % TODO: define what  a secure channel is?? 
 It also requires that the service's internal clock time MUST be monotonic and have integrity. % TODO: clarify this? 
 In addition, the client and service MUST agree upon a unique \username{} that identifies the client. 
 
 % TODO: scheme here.. 
 
-\subsection{PKAuth for Websites}
+\subsection{\pkap{} for Websites}
 
-While the PKAuth authentication protocol can be used over any secure channel, special considerations must be taken into account when authenticating over \texttt{https} in the browser. 
-In particular, PKAuth compliant websites MUST embed the html header tag \texttt{pkauth}. 
+While the \pkap{} authentication protocol can be used over any secure channel, special considerations must be taken into account when authenticating over \texttt{https} in the browser. 
+In particular, \pkap{} compliant websites MUST embed the html header tag \texttt{pkauth}. 
 The \texttt{pkauth} tag MUST always contain the attributes \texttt{href} and \texttt{token}. 
-The \texttt{href} attribute MUST point to a URL on the same domain of the current webpage that will handle PKAuth requests. 
+The \texttt{href} attribute MUST point to a URL on the same domain of the current webpage that will handle \pkap{} requests. 
 This URL is referred to as \texttt{authUrl}. 
 The \texttt{token} attribute MUST be a random sequence of characters to prevent CSRF attacks. % TODO: RFC for CSRF tokens??
 If the user is not logged into the website, \texttt{href} and \texttt{token} are the only required attributes. 
@@ -1029,11 +1035,11 @@ The public key information MUST NOT be transported via GET variables.
 % TODO: Other pki like AD or redhat? XXXs
 
 
-\subsection{PKAuth for Applications}
+\subsection{\pkap{} for Applications}
 
 \todo{implement this}
 
-PKAuth supports authentication for non-browser client side applications. 
+\pkap{} supports authentication for non-browser client side applications. 
 To establish a token, the client sends a POST request to the \texttt{authUrl} where the \texttt{verb} key has value \texttt{token}. 
 The web service responds with a JSON encoded token (\Cref{fig:token_response}). 
 The server creates and sets the token if necessary. 
@@ -1083,7 +1089,7 @@ An example is shown in \Cref{fig:extra_response}.
 \todo{JP: Don't know if this should be included since it reopens the possibility for phishing attacks.}
 
 There are times when users need to authenticate on devices that are not approved in their \texttt{PKATree}. 
-To support this functionality, PKAuth supports \emph{External Authentication}. 
+To support this functionality, \pkap{} supports \emph{External Authentication}. 
 
 \todo{JP: Mention something about sqrl?}
 
