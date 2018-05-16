@@ -145,7 +145,7 @@ Functions \texttt{ripeMD160} and \texttt{sha256} respectively are the RIPEMD160 
 The function \texttt{firstFourBytes} take the first four bytes of input and drops the rest. 
 The function \texttt{base58} encodes binary data using the bitcoin alphabet \cite{base58}. 
 Concatenation is represented by \texttt{||}. 
-\texttt{PKAIdentifier}'s are similar to Bitcoin addresses, and they have checksums to help determine whether an identifier is correct \cite{bitcoinaddress}. 
+\texttt{PKAIdentifier}'s are similar to Bitcoin addresses, and they have checksums to help determine whether an identifier is valid. % correct \cite{bitcoinaddress}. 
 
 %\todo{Common}
 %
@@ -207,15 +207,15 @@ The key \texttt{identifier} is the unique identifier of the secret key used to a
 
 When verifying a \texttt{PKAMac}, one MUST verify that the algorithm of the secret key matches the algorithm in the \texttt{PKAMac}, the secret key's identifier matches the identifier in the \texttt{PKAMac}, and the tag is valid. 
 
+\jp{Should the identifier be optional? Is it needed/useful?}
+
 \subsubsection{HMAC with SHA256}
 
-HMAC with SHA256 is a cryptographic algorithm used for symmetric authentication \cite{hmacsh256}. 
+HMAC with SHA256 is a cryptographic algorithm used for symmetric authentication \cite{rfc4868}. % PRF-HMAC-SHA-256
 The algorithm identifier (\texttt{PKAAlgorithm}) for HMAC with SHA256 is \texttt{"sa-hmacsha256"}. 
 The PSF encoding for HMAC with SHA256 secret keys (\texttt{MacKey}) is simply the 256 bit binary secret key. 
 The PSF encoding for HMAC with SHA256 authentication tags (\texttt{MacTag}) is the 256 bit binary SHA256 output. 
 The secret key identifier (\texttt{PKAIdentifier}) for HMAC with SHA256 is the output of \texttt{toIdentifier} where the input is the PSF encoded secret key. 
-
-\todo{need to worry about endianness?}
 
 \begin{figure}
 \begin{lstlisting}
