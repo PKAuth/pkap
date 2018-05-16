@@ -261,7 +261,7 @@ AES GCM & 256 & se-aesgcm256 \\
 \end{tabular}
 \end{center}
 \caption{Summary of symmetric encryption algorithms.}
-\label{table:symmetric_auth_alg}
+\label{table:symmetric_enc_alg}
 \end{table}
 
 Symmetric encryption is used to encrypt data using a secret key. \Cref{table:symmetric_enc_alg} summarizes the symmetric encryption algorithms supported by \pkap{}. 
@@ -290,10 +290,10 @@ When decrypting a \texttt{PKASymEncrypted}, one MUST verify that the algorithm i
 
 \subsubsection{AES GCM (256)}
 
-AES GCM is a cryptographic algorithm used for symmetric encryption \cite{todo}. 
+AES GCM is a cryptographic algorithm used for symmetric encryption \cite{aesgcm}. 
 Its algorithm identifier (\texttt{PKAAlgorithm}) is \texttt{"se-aesgcm256"}. 
 The PSF encoding for AES GCM secret keys (\texttt{EncSecretKey}) is the 256 bit binary secret key. 
-The PSF encoding for AES GCM ciphertexts (\texttt{SymEncrypted a}) is binary ciphertext as defined by \cite{todo}. 
+The PSF encoding for AES GCM ciphertexts (\texttt{SymEncrypted a}) is the concatenation of a 96 bit initialization vector (IV), the GCM ciphertext, and a 128 bit tag. 
 The secret key identifier (\texttt{PKAIdentifier}) for AES GCM is the output of \texttt{toIdentifier} where the input is the PSF encoded secret key. 
 
 %\todo{TODO}
@@ -389,10 +389,10 @@ When verifying a \texttt{PKASigned a},  one MUST verify that the algorithm of th
 
 % https://blog.mozilla.org/warner/2011/11/29/ed25519-keys/ (wrapper around supercop impl)
 
-ED25519 is one of the cryptographic algorithms used for asymmetric authentication \cite{ed25519}. % https://ed25519.cr.yp.to/ed25519-20110926.pdf
+ED25519 is one of the cryptographic algorithms used for asymmetric authentication \cite{rfc8032}. % https://ed25519.cr.yp.to/ed25519-20110926.pdf
 Its algorithm identifer (\texttt{PKAAlgorithm}) is \texttt{"aa-ed25519"}. 
-The PSF encoding for ED25519 public keys (\texttt{AuthPublicKey}) is the binary \texttt{A} (as defined in \todo{???}). 
-The PSF encoding for ED25519 private keys (\texttt{AuthPrivateKey}) is the binary \texttt{k} concatenated with \texttt{A} (as defined in \todo{???}). 
+The PSF encoding for ED25519 public keys (\texttt{AuthPublicKey}) is \texttt{A}. 
+The PSF encoding for ED25519 private keys (\texttt{AuthPrivateKey}) is \texttt{k} concatenated with \texttt{A}. 
 Both \texttt{k} and \texttt{A} are 256 bits each. 
 The identifier (\texttt{PKAIdentifier}) for both the public key and the private key is the output of \texttt{toIdentifier} where the input is the PSF encoded public key. 
 The PSF encoded signature for ED25519 is the 256 bit \texttt{R} concatenated with the 256 bit \texttt{S}.
