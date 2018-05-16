@@ -7,10 +7,11 @@
 \usepackage{listings}
 \lstset{basicstyle=\ttfamily}
 
-\usepackage{cleveref}
 \usepackage{color}
 \usepackage[margin=1in]{geometry}
 \usepackage[affil-it]{authblk}
+\usepackage[hidelinks]{hyperref}
+\usepackage{cleveref}
 
 \newcommand{\pk}{$\mathcal{PK}$}
 \newcommand{\pki}{$\mathcal{PK}_i$}
@@ -103,9 +104,9 @@ Client-side applications on mobile and desktop can authenticate their users with
 % \todo{Section \ref{sec:algorithms} provides standardized encoding format for various cryptographic ... signed sets... authentication API}
 
 The rest of this document describes \pkap{}'s standards and protocol in detail. 
-Section \ref{sec:algorithms} defines a standardized encoding format for the cryptographic algorithms used. 
-Section \ref{sec:identities} defines how cryptographic identities are encoded. 
-Section \ref{sec:pkap} details how \pkap{} clients and servers interact to authenticate users and share cryptographic identities. 
+\Cref{sec:algorithms} defines a standardized encoding format for the cryptographic algorithms used. 
+\Cref{sec:identities} defines how cryptographic identities are encoded. 
+\Cref{sec:pkap} details how \pkap{} clients and servers interact to authenticate users and share cryptographic identities. 
 
 \subsection{Conventions Used in This Document}
 
@@ -140,7 +141,7 @@ toIdentifier( data : Data) : PKAIdentifier =
 There are times when a cryptographic key needs to be identified without revealing the key itself. 
 This identifier has type \texttt{PKAIdentifier}, which is a type alias for strings. 
 To help construct identifiers, we define the function `toIdentifier` above. 
-Functions \texttt{ripeMD160} and \texttt{sha256} respectively are the RIPEMD160 and SHA256 hash algorithms \cite{ripemd160, sha256}. 
+Functions \texttt{ripeMD160} and \texttt{sha256} respectively are the RIPEMD160 and SHA256 hash algorithms \cite{ripemd160, rfc4634}. 
 The function \texttt{firstFourBytes} take the first four bytes of input and drops the rest. 
 The function \texttt{base58} encodes binary data using the bitcoin alphabet \cite{base58}. 
 Concatenation is represented by \texttt{||}. 
