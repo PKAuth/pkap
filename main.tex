@@ -1077,156 +1077,156 @@ The public key information MUST NOT be transported via GET variables.
 % TODO: Other pki like AD or redhat? XXXs
 
 
-\subsection{\pkap{} for Applications}
-
-\todo{implement this}
-
-\pkap{} supports authentication for non-browser client side applications. 
-To establish a token, the client sends a POST request to the \texttt{authUrl} where the \texttt{verb} key has value \texttt{token}. 
-The web service responds with a JSON encoded token (\Cref{fig:token_response}). 
-The server creates and sets the token if necessary. 
-
-\begin{figure}[h]
-\begin{lstlisting}
-{
-    "token" : "95eYX2IN"
-}
-\end{lstlisting}
-\caption{A successful POST response with the token.}
-\label{fig:token_response}
-\end{figure}
-
-With a token, the client can authenticate as usual. 
-The web service might need to provide additional information to the client upon successful authentication. 
-It can do so by providing any valid JSON value for the key \texttt{extra} in the successful authentication JSON response. 
-An example is shown in \Cref{fig:extra_response}.
-
-\begin{figure}[h]
-\begin{lstlisting}
-{
-    "success" : true,
-    "extra" : {
-        "key1" : "...",
-        "key2" : [1,2,3],
-        "key3" : false
-    }
-}
-\end{lstlisting}
-\caption{A successful JSON authentication response with additional information returned for the \texttt{extra} key.}
-\label{fig:extra_response}
-\end{figure}
-
-% \todo{Return session passes?}
-
-%\todo{add 'method' to initiate?}
-%- enum w/ "redirect" | "session"
-%
-%
-%.. client
-%
-% Desktop/mobile applications
-
-\subsection{External Authentication}
-
-\todo{JP: Don't know if this should be included since it reopens the possibility for phishing attacks.}
-
-There are times when users need to authenticate on devices that are not approved in their \texttt{PKATree}. 
-To support this functionality, \pkap{} supports \emph{External Authentication}. 
-
-\todo{JP: Mention something about sqrl?}
-
-\subsubsection{Login}
-\label{ss:login}
-
-To start the login process for \emph{External Authentication}, the external client generates two random 256 bit integers, an \texttt{id} and a \texttt{secret}. 
-It then computes \texttt{challenge} which is the \texttt{sha256} hash of \texttt{secret}. 
-Now the external client generates a QR code encoding a URL pointing to the \texttt{authUrl} with scheme \texttt{pkexternal}. 
-The GET key \texttt{i} is the Base64Url encoded \texttt{id} and the \texttt{c} key is the Base64Url encoded \texttt{challenge}.
-Here is an example. 
-
-%\begin{figure}
-%\begin{lstlisting}
-%pkexternal:// || authUrl || /i?= || base64Url(id) 
-%    || &c= || base64Url( challenge)
-%\end{lstlisting}
-%\caption{}
-%\label{}
-%\end{figure}
-
-%\begin{figure}
-\begin{lstlisting}
-pkexternal://domain.name/pkauth?i=MzJzZHNkZ&c=mFmMjNpdWFzZ
-\end{lstlisting}
-%\caption{}
-%\label{}
-%\end{figure}
-
-% \todo{GET token?}
-
-The external client presents the QR code to the user, which the user can scan with an approved device. 
-After parsing the QR code, the approved device SHOULD prompt the user to check that the domain name of the \texttt{authURL} matches the domain name on the external device. 
-The approved device can then authenticate as described in \Cref{ss:login}, except with a few differences. 
-In the initial POST request (previously shown in \Cref{fig:init_req}), the POST key \texttt{external} now contains a JSON encoded \texttt{ExternalChallenge}. 
-
-\begin{lstlisting}
-type ExternalChallenge = {
-    "identifier" : String
-  , "challenge" : String
-}
-\end{lstlisting}
-
-If the web service supports \emph{External Authentication}, the returned PKAChallenge MUST include the provided \texttt{ExternalChallenge}. 
-\todo{Otherwise, the web service MUST return a \texttt{404 Not Found} response.} % JP: What error code???
-The approved device MUST verify that the returned \texttt{ExternalChallenge} equals the original sent. 
-It can then authenticate as usual. 
-Once the web service authenticates the signed \texttt{PKASigned (PKAMac PKAChallenge)}, it should record the \texttt{timestamp} and \texttt{ExternalChallenge}. 
-
-Meanwhile, the external device should periodically send a POST request to the \texttt{authUrl}. 
-The rate of requests MUST be limited to at most two requests per second. 
-In this request, the \texttt{verb} key has value \texttt{external}, the \texttt{identifier} key is the Base64Url encoded \texttt{id}, and the \texttt{secret} key is the Base64Url encoded \texttt{secret}. 
-When the web service receives the request, it MUST verify that the \texttt{id} equals one it has previously authenticated and that the \texttt{secret} equals the SHA256 hash of the accompanying \texttt{challenge}. 
-If not, the web service MUST return a \todo{\texttt{404 Not Found}} response, and the external device can try authenticating again.
-The web service MUST also check that the \texttt{timestamp} has not expired, returning a \todo{\texttt{410 Gone}} response if it has. 
-Upon success, the web service can authenticate the device with a \texttt{200 OK} response. \todo{Should we add an example here as well? Redirects, or "extra"?}
-For web browsers, actions performed by the external client can be done via javascript provided by the web service. 
-
-\todo{implement this?}
-
-
-
-
-
-
-\todo{Other considerations: Constant time equality checks}
-
-\todo{What about the token??}
-
-
-
-
-
-
-
-%\begin{lstlisting}
-%type ExternalSecret = {
-%    "identifier" : String
-%  , "secret" : String
-%}
-%\end{lstlisting}
-
-
-
-\subsubsection{Limitations}
-
-One large limitation with \emph{External Authentication} is that phishing attacks are now possible. 
-Another limitation is that users must trust the external device with the authenticated session. 
-Due to these limitations, users or web services can choose to disable \emph{External Authentication}. 
-A user can disable \emph{External Authentication} by setting the key \texttt{external} to \texttt{false} at any node in their \texttt{PKATree}. 
-Web services can disable \emph{External Authentication} by not supporting it at their \texttt{authUrl} endpoint. 
-Web services could also choose to enable \emph{External Authentication}, but reduced privileges of the authenticated session. 
-For instance, users authenticated via \emph{External Authentication} might not have permission to edit their profile or security settings while using an external device. 
-
-
+%%%\subsection{\pkap{} for Applications}
+%%%
+%%%\todo{implement this}
+%%%
+%%%\pkap{} supports authentication for non-browser client side applications. 
+%%%To establish a token, the client sends a POST request to the \texttt{authUrl} where the \texttt{verb} key has value \texttt{token}. 
+%%%The web service responds with a JSON encoded token (\Cref{fig:token_response}). 
+%%%The server creates and sets the token if necessary. 
+%%%
+%%%\begin{figure}[h]
+%%%\begin{lstlisting}
+%%%{
+%%%    "token" : "95eYX2IN"
+%%%}
+%%%\end{lstlisting}
+%%%\caption{A successful POST response with the token.}
+%%%\label{fig:token_response}
+%%%\end{figure}
+%%%
+%%%With a token, the client can authenticate as usual. 
+%%%The web service might need to provide additional information to the client upon successful authentication. 
+%%%It can do so by providing any valid JSON value for the key \texttt{extra} in the successful authentication JSON response. 
+%%%An example is shown in \Cref{fig:extra_response}.
+%%%
+%%%\begin{figure}[h]
+%%%\begin{lstlisting}
+%%%{
+%%%    "success" : true,
+%%%    "extra" : {
+%%%        "key1" : "...",
+%%%        "key2" : [1,2,3],
+%%%        "key3" : false
+%%%    }
+%%%}
+%%%\end{lstlisting}
+%%%\caption{A successful JSON authentication response with additional information returned for the \texttt{extra} key.}
+%%%\label{fig:extra_response}
+%%%\end{figure}
+%%%
+%%%% \todo{Return session passes?}
+%%%
+%%%%\todo{add 'method' to initiate?}
+%%%%- enum w/ "redirect" | "session"
+%%%%
+%%%%
+%%%%.. client
+%%%%
+%%%% Desktop/mobile applications
+%%%
+%%%\subsection{External Authentication}
+%%%
+%%%\todo{JP: Don't know if this should be included since it reopens the possibility for phishing attacks.}
+%%%
+%%%There are times when users need to authenticate on devices that are not approved in their \texttt{PKATree}. 
+%%%To support this functionality, \pkap{} supports \emph{External Authentication}. 
+%%%
+%%%\todo{JP: Mention something about sqrl?}
+%%%
+%%%\subsubsection{Login}
+%%%\label{ss:login}
+%%%
+%%%To start the login process for \emph{External Authentication}, the external client generates two random 256 bit integers, an \texttt{id} and a \texttt{secret}. 
+%%%It then computes \texttt{challenge} which is the \texttt{sha256} hash of \texttt{secret}. 
+%%%Now the external client generates a QR code encoding a URL pointing to the \texttt{authUrl} with scheme \texttt{pkexternal}. 
+%%%The GET key \texttt{i} is the Base64Url encoded \texttt{id} and the \texttt{c} key is the Base64Url encoded \texttt{challenge}.
+%%%Here is an example. 
+%%%
+%%%%\begin{figure}
+%%%%\begin{lstlisting}
+%%%%pkexternal:// || authUrl || /i?= || base64Url(id) 
+%%%%    || &c= || base64Url( challenge)
+%%%%\end{lstlisting}
+%%%%\caption{}
+%%%%\label{}
+%%%%\end{figure}
+%%%
+%%%%\begin{figure}
+%%%\begin{lstlisting}
+%%%pkexternal://domain.name/pkauth?i=MzJzZHNkZ&c=mFmMjNpdWFzZ
+%%%\end{lstlisting}
+%%%%\caption{}
+%%%%\label{}
+%%%%\end{figure}
+%%%
+%%%% \todo{GET token?}
+%%%
+%%%The external client presents the QR code to the user, which the user can scan with an approved device. 
+%%%After parsing the QR code, the approved device SHOULD prompt the user to check that the domain name of the \texttt{authURL} matches the domain name on the external device. 
+%%%The approved device can then authenticate as described in \Cref{ss:login}, except with a few differences. 
+%%%In the initial POST request (previously shown in \Cref{fig:init_req}), the POST key \texttt{external} now contains a JSON encoded \texttt{ExternalChallenge}. 
+%%%
+%%%\begin{lstlisting}
+%%%type ExternalChallenge = {
+%%%    "identifier" : String
+%%%  , "challenge" : String
+%%%}
+%%%\end{lstlisting}
+%%%
+%%%If the web service supports \emph{External Authentication}, the returned PKAChallenge MUST include the provided \texttt{ExternalChallenge}. 
+%%%\todo{Otherwise, the web service MUST return a \texttt{404 Not Found} response.} % JP: What error code???
+%%%The approved device MUST verify that the returned \texttt{ExternalChallenge} equals the original sent. 
+%%%It can then authenticate as usual. 
+%%%Once the web service authenticates the signed \texttt{PKASigned (PKAMac PKAChallenge)}, it should record the \texttt{timestamp} and \texttt{ExternalChallenge}. 
+%%%
+%%%Meanwhile, the external device should periodically send a POST request to the \texttt{authUrl}. 
+%%%The rate of requests MUST be limited to at most two requests per second. 
+%%%In this request, the \texttt{verb} key has value \texttt{external}, the \texttt{identifier} key is the Base64Url encoded \texttt{id}, and the \texttt{secret} key is the Base64Url encoded \texttt{secret}. 
+%%%When the web service receives the request, it MUST verify that the \texttt{id} equals one it has previously authenticated and that the \texttt{secret} equals the SHA256 hash of the accompanying \texttt{challenge}. 
+%%%If not, the web service MUST return a \todo{\texttt{404 Not Found}} response, and the external device can try authenticating again.
+%%%The web service MUST also check that the \texttt{timestamp} has not expired, returning a \todo{\texttt{410 Gone}} response if it has. 
+%%%Upon success, the web service can authenticate the device with a \texttt{200 OK} response. \todo{Should we add an example here as well? Redirects, or "extra"?}
+%%%For web browsers, actions performed by the external client can be done via javascript provided by the web service. 
+%%%
+%%%\todo{implement this?}
+%%%
+%%%
+%%%
+%%%
+%%%
+%%%
+%%%\todo{Other considerations: Constant time equality checks}
+%%%
+%%%\todo{What about the token??}
+%%%
+%%%
+%%%
+%%%
+%%%
+%%%
+%%%
+%%%%\begin{lstlisting}
+%%%%type ExternalSecret = {
+%%%%    "identifier" : String
+%%%%  , "secret" : String
+%%%%}
+%%%%\end{lstlisting}
+%%%
+%%%
+%%%
+%%%\subsubsection{Limitations}
+%%%
+%%%One large limitation with \emph{External Authentication} is that phishing attacks are now possible. 
+%%%Another limitation is that users must trust the external device with the authenticated session. 
+%%%Due to these limitations, users or web services can choose to disable \emph{External Authentication}. 
+%%%A user can disable \emph{External Authentication} by setting the key \texttt{external} to \texttt{false} at any node in their \texttt{PKATree}. 
+%%%Web services can disable \emph{External Authentication} by not supporting it at their \texttt{authUrl} endpoint. 
+%%%Web services could also choose to enable \emph{External Authentication}, but reduced privileges of the authenticated session. 
+%%%For instance, users authenticated via \emph{External Authentication} might not have permission to edit their profile or security settings while using an external device. 
+%%%
+%%%
 
 
 
