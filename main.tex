@@ -584,18 +584,18 @@ The PSF encoding for X25519 public keys (\texttt{EncPublicKey}) and private keys
 The identifier (\texttt{PKAIdentifier}) for both the public key and the private key is the output of \texttt{toIdentifier} where the input is the PSF encoded public key. 
 The 512 bit seed is asymmetrically encrypted by generating an ephemeral key pair and performing Diffie-Hellman key exchange to generate a shared secret. 
 Take the SHA512 of the shared secret and xor it with the 512 bit seed. 
-The PSF encoded ciphertext (\texttt{PKAAsymEncrypted512}) for X25519 is 256 bits of the ephemeral public key concatenated with 512 bits of the encrypted seed. 
+The PSF encoded ciphertext (\texttt{AsymEncrypted512}) for X25519 is 256 bits of the ephemeral public key concatenated with 512 bits of the encrypted seed. 
 
 \subsubsection{RSA OAEP with SHA256 and MGF1}
 
 \todo{Note: May drop RSA. Not currently in Rust implementation.}
 
-RSA OAEP with SHA256 and MGF1 is a cryptographic algorithm used for asymmetric encryption \cite{rsaoaep}. % RFC 2437
+RSA OAEP with SHA256 and MGF1 is a cryptographic algorithm used for asymmetric encryption \cite{rfc3447}. % RFC 2437
 Its algorithm identifier (\texttt{PKAAlgorithm}) is \texttt{"ae-rsa2048oaep256"}. 
 The PSF encodings for RSA public keys (\texttt{EncPublicKey}), private keys (\texttt{EncPublicKey}), and the identifier (\texttt{PKAIdentifier}) for both public and private keys are the same as previously defined in \Cref{sec:rsapss}. 
-The PSF encoding for ciphertexts (\texttt{Encrypted a}) is the \todo{encrypted binary output}. % X || Y? https://en.wikipedia.org/wiki/Optimal_asymmetric_encryption_padding
-
-\todo{encrypting symmetric keys and ciphertexts}
+The PSF encoding for ciphertexts (\texttt{Encrypted a}) is the encrypted 512 bit seed. 
+% \todo{encrypted binary output}. % X || Y? https://en.wikipedia.org/wiki/Optimal_asymmetric_encryption_padding
+% \todo{encrypting symmetric keys and ciphertexts}
 
 %\todo{TODO:}
 %- cite reference
