@@ -388,14 +388,15 @@ When verifying a \texttt{PKASigned a},  one MUST verify that the algorithm of th
 \subsubsection{ED25519}
 
 % https://blog.mozilla.org/warner/2011/11/29/ed25519-keys/ (wrapper around supercop impl)
+% https://ed25519.cr.yp.to/ed25519-20110926.pdf
 
-ED25519 is one of the cryptographic algorithms used for asymmetric authentication \cite{rfc8032}. % https://ed25519.cr.yp.to/ed25519-20110926.pdf
+ED25519 is one of the cryptographic algorithms used for asymmetric authentication \cite{rfc8032}. 
 Its algorithm identifer (\texttt{PKAAlgorithm}) is \texttt{"aa-ed25519"}. 
 The PSF encoding for ED25519 public keys (\texttt{AuthPublicKey}) is \texttt{A}. 
 The PSF encoding for ED25519 private keys (\texttt{AuthPrivateKey}) is \texttt{k} concatenated with \texttt{A}. 
 Both \texttt{k} and \texttt{A} are 256 bits each. 
 The identifier (\texttt{PKAIdentifier}) for both the public key and the private key is the output of \texttt{toIdentifier} where the input is the PSF encoded public key. 
-The PSF encoded signature for ED25519 is the 256 bit \texttt{R} concatenated with the 256 bit \texttt{S}.
+The PSF encoded signature (\texttt{Signature}) for ED25519 is the 256 bit \texttt{R} concatenated with the 256 bit \texttt{S}.
 
 
 
@@ -415,14 +416,16 @@ The PSF encoded signature for ED25519 is the 256 bit \texttt{R} concatenated wit
 \subsubsection{RSA PSS with SHA256}
 \label{sec:rsapss}
 
-RSA PSS with SHA256 is a cryptographic algorithm used for asymmetric authentication \cite{rsapsssha256}. 
+\todo{Note: May drop RSA. Not currently in Rust implementation.}
+
+RSA PSS with SHA256 is a cryptographic algorithm used for asymmetric authentication \cite{rfc3447}. 
 Its algorithm identifier (\texttt{PKAAlgorithm}) is \texttt{"aa-rsa2048pss256"}. 
-The PSF encoding for RSA public keys (\texttt{AuthPublicKey}) is the \texttt{mpint} of \texttt{n} and \texttt{e} (as defined in \todo{???}):
+The PSF encoding for RSA public keys (\texttt{AuthPublicKey}) is the \texttt{mpint} of \texttt{n} and \texttt{e}:
 \begin{lstlisting}
 mpint public_n
 mpint public_e
 \end{lstlisting}
-The PSF encoding for RSA private keys (\texttt{AuthPrivateKey}) is the \texttt{mpint} of \texttt{n}, \texttt{e}, \texttt{d}, \texttt{p}, \texttt{q}, \texttt{dP}, \texttt{dQ}, \texttt{qInv} (as defined in \todo{???}): 
+The PSF encoding for RSA private keys (\texttt{AuthPrivateKey}) is the \texttt{mpint} of \texttt{n}, \texttt{e}, \texttt{d}, \texttt{p}, \texttt{q}, \texttt{dP}, \texttt{dQ}, \texttt{qInv}: 
 \begin{lstlisting}
 mpint public_n
 mpint public_e
@@ -434,11 +437,7 @@ mpint private_dQ
 mpint private_qInv
 \end{lstlisting}
 The identifier (\texttt{PKAIdentifier}) for both the public key and the private key is the output of \texttt{toIdentifier} where the input is the PSF encoded public key. 
-The PSF encoding for the RSA PSS with SHA256 signature (\texttt{Signature}) is \todo{the binary digital signature}.
-
-% public key normal form (big endian)
-
-\todo{mgf1, salt length, trailer field??}
+The PSF encoded signature (\texttt{Signature}) for RSA PSS is the digital signature generated using SHA256, MGF1, and a \texttt{0xbc} trailer field.
 
 \subsection{Asymmetric Encryption}
 
@@ -461,6 +460,8 @@ RSA OAEP with SHA256 and MGF1 & 2048 & ae-rsa2048oaep256 \\
 \end{table}
 
 \jp{TODO: ae-x25519}
+
+\jp{TODO: Define updated types, how to derive symmetric keys. }
 
 
 \begin{lstlisting}
@@ -548,6 +549,8 @@ and the key's identifier matches the \texttt{identifier}.
 
 
 \subsubsection{RSA OAEP with SHA256 and MGF1}
+
+\todo{Note: May drop RSA. Not currently in Rust implementation.}
 
 RSA OAEP with SHA256 and MGF1 is a cryptographic algorithm used for asymmetric encryption \cite{rsaoaep}. % RFC 2437
 Its algorithm identifier (\texttt{PKAAlgorithm}) is \texttt{"ae-rsa2048oaep256"}. 
