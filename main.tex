@@ -456,6 +456,7 @@ Asymmetric encryption algorithms are used to encrypt messages.
 Asymmetric Encryption Algorithm & Public Key Length (bits) & Algorithm Identifier \\ 
 \hline
 RSA OAEP with SHA256 and MGF1 & 2048 & ae-rsa2048oaep256 \\
+X25519 & 256  & ae-x25519 \\
 \hline
 \end{tabular}
 \caption{Summary of asymmetric encryption algorithms.}
@@ -575,13 +576,15 @@ and the key's identifier matches the identifier from \texttt{keys}.
 %When decrypting a \texttt{PKAAsymEncrypted a}, one MUST verify that the algorithm of the public key matches the algorithm in the \texttt{PKAAsymEncrypted a} and the key's identifier matches the identifier in the \texttt{PKAAsymEncrypted a}. 
 
 
+\subsubsection{X25519}
 
-
-
-
-
-
-
+X25519 is a cryptographic algorithm used for asymmetric encryption \cite{rfc7748}. 
+Its algorithm identifier (\texttt{PKAAlgorithm}) is \texttt{"ae-x25519"}. 
+The PSF encoding for X25519 public keys (\texttt{EncPublicKey}) and private keys (\texttt{EncPrivateKey}) are both 256 bits. 
+The identifier (\texttt{PKAIdentifier}) for both the public key and the private key is the output of \texttt{toIdentifier} where the input is the PSF encoded public key. 
+The 512 bit seed is asymmetrically encrypted by generating an ephemeral key pair and performing Diffie-Hellman key exchange to generate a shared secret. 
+Take the SHA512 of the shared secret and xor it with the 512 bit seed. 
+The PSF encoded ciphertext (\texttt{PKAAsymEncrypted512}) for X25519 is 256 bits of the ephemeral public key concatenated with 512 bits of the encrypted seed. 
 
 \subsubsection{RSA OAEP with SHA256 and MGF1}
 
