@@ -288,6 +288,8 @@ type PKASymEncrypted a = {
 
 When decrypting a \texttt{PKASymEncrypted}, one MUST verify that the algorithm in the secret key, \texttt{PKAEncSecretKey}, matches the algorithm in the \texttt{PKASymEncrypted a} and the key's identifier matches the identifier in the \texttt{PKASymEncrypted a}. 
 
+Each algorithm has a standard key derivation function (\texttt{PKAKDF}) that produces a symmetric encryption key with inputs of a password, salt, and number of iterations. 
+
 \subsubsection{AES GCM (256)}
 
 AES GCM is a cryptographic algorithm used for symmetric encryption \cite{aesgcm}. 
@@ -295,6 +297,8 @@ Its algorithm identifier (\texttt{PKAAlgorithm}) is \texttt{"se-aesgcm256"}.
 The PSF encoding for AES GCM secret keys (\texttt{EncSecretKey}) is the 256 bit binary secret key. 
 The PSF encoding for AES GCM ciphertexts (\texttt{SymEncrypted a}) is the concatenation of a 96 bit initialization vector (IV), the GCM ciphertext, and a 128 bit tag. 
 The secret key identifier (\texttt{PKAIdentifier}) for AES GCM is the output of \texttt{toIdentifier} where the input is the PSF encoded secret key. 
+
+The standard \texttt{PKAKDF} for AES GCM is PBKDF2 with SHA256 \cite{rfc2898}.
 
 %\todo{TODO}
 %
@@ -482,43 +486,74 @@ type PKAEncPrivateKey = {
 }
 \end{lstlisting}
 
-\texttt{PKAEncPrivateKey a} is the record type used to encode asymmetric encryption private keys. 
+\texttt{PKAEncPrivateKey} is the record type used to encode asymmetric encryption private keys. 
 The key \texttt{algorithm} states which asymmetric encryption algorithm the private key corresponds to. 
 The \texttt{private\_key} key is the Base64Url encoding of the PSF encoded private key, where the PSF encoding is dependent on the algorithm used. 
 
+%type PKAAsymEncryptedKey = {
+%    "key" : AsymEncrypted PKAEncSecretKey
+%  , "identifier" : PKAIdentifier
+%  , "algorithm" : PKAAlgorithm
+%}
+%
+%type PKAAsymEncrypted a = {
+%    "symmetric_keys" : [PKAAsymEncryptedKey]
+%    "ciphertext" : PKASymEncrypted a
+%}
+%
 \begin{lstlisting}
-type PKAAsymEncryptedKey = {
-    "key" : AsymEncrypted PKAEncSecretKey
-  , "identifier" : PKAIdentifier
+type PKAAsymEncrypted512 = {
+    "ciphertext" : AsymEncrypted512
   , "algorithm" : PKAAlgorithm
 }
 
 type PKAAsymEncrypted a = {
-    "symmetric_keys" : [PKAAsymEncryptedKey]
+    "keys" : {PKAIdentifier : PKAAsymEncrypted512}
     "ciphertext" : PKASymEncrypted a
 }
 \end{lstlisting}
 
+\jp{A single "key" option without identifiers?}
+
+%type PKAAsymEncrypted a = {
+%    "keys" : {PKAIdentifier : PKAAsymEncrypted512}
+%    "ciphertext" : PKASymEncrypted a
+%} | {
+%    "key" : PKAAsymEncrypted512
+%    "ciphertext" : PKASymEncrypted a
+%}
+
 Asymmetric encryption is typically limited in the length of messages which can be encrypted. 
 Therefore, \pkap{} generates a symmetric secret key which is used to encrypt the message. 
-Then the symmetric secret key is encrypted with each of the asymmetric public keys. 
-\texttt{PKAAsymEncryptedKey} is the record type used to encode the asymmetrically encrypted symmetric secret key. 
-The \texttt{key} key is the Base64Url encoding of the PSF encoded (symmetric key) ciphertext. 
-The key \texttt{algorithm} states which asymmetric encryption algorithm was used. 
-The key \texttt{identifier} is the unique identifier of the key pair used to encrypt the content (Corresponding public and private keys always share the same identifier). 
+The symmetric secret key is created by randomly generating a 512 bit seed and passing the seed to the respective \texttt{PKAKDF} as the password (the salt is the empty string and the number of iterations is one). 
+Then the 512 bit seed is encrypted with each of the asymmetric public keys. 
 
-\texttt{PKAAsymEncrypted a} is the record type that encodes the message ciphertext and the set of encrypted symmetric secret keys. 
-The \texttt{ciphertext} key contains the encrypted message as type \texttt{PKASymEncrypted a} (\Cref{type-PKASymEncrypted}). 
+\texttt{PKAAsymEncrypted512} is the record type used to encode the 512 asymmetrically encrypted bits. 
+The \texttt{ciphertext} key is the Base64Url encoding of the PSF encoded ciphertext, which is dependent of the algorithm used. 
+The key \texttt{algorithm} states which asymmetric encryption algorithm was used. 
+
+\texttt{PKAAsymEncrypted a} is the record type that encodes the message ciphertext and the dictionary of encrypted symmetric secret keys. 
+The \texttt{ciphertext} key contains the symmetrically encrypted message with type \texttt{PKASymEncrypted a} (\Cref{type-PKASymEncrypted}). 
 Any content of type \texttt{a} can be encrypted as long as \texttt{a} is encodable in binary. 
 Unless otherwise specified, this specification's default binary encoding is JSON. 
-The \texttt{symmetric\_keys} key contains the symmetric secret keys as type \texttt{[PKAAsymEncryptedKey]}. 
+The \texttt{keys} key contains a dictionary of public key identifiers to asymmetrically encrypted 512 bit seeds (\texttt{\{PKAIdentifier : PKAAsymEncrypted512\}}). 
 
-When decrypting a \texttt{PKAAsymEncryptedKey}, one MUST verify that the algorithm of the public key matches the \texttt{algorithm} % in the \texttt{PKAAsymEncryptedKey} 
-and the key's identifier matches the \texttt{identifier}. 
+%
+%
+%\texttt{PKAAsymEncryptedKey} is the record type used to encode the asymmetrically encrypted symmetric secret key. 
+%The \texttt{key} key is the Base64Url encoding of the PSF encoded (symmetric key) ciphertext. 
+%The key \texttt{algorithm} states which asymmetric encryption algorithm was used. 
+%The key \texttt{identifier} is the unique identifier of the key pair used to encrypt the content (Corresponding public and private keys always share the same identifier). 
+%
+%\texttt{PKAAsymEncrypted a} is the record type that encodes the message ciphertext and the set of encrypted symmetric secret keys. 
+%The \texttt{ciphertext} key contains the encrypted message as type \texttt{PKASymEncrypted a} (\Cref{type-PKASymEncrypted}). 
+%Any content of type \texttt{a} can be encrypted as long as \texttt{a} is encodable in binary. 
+%Unless otherwise specified, this specification's default binary encoding is JSON. 
+%The \texttt{symmetric\_keys} key contains the symmetric secret keys as type \texttt{[PKAAsymEncryptedKey]}. 
+
+When decrypting a \texttt{PKAAsymEncrypted512}, one MUST verify that the algorithm of the public key matches the \texttt{algorithm} % in the \texttt{PKAAsymEncryptedKey} 
+and the key's identifier matches the identifier from \texttt{keys}. 
 % in the \texttt{PKAAsymEncryptedKey}. 
-
-
-
 
 %
 %
