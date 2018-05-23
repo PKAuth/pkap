@@ -464,11 +464,6 @@ X25519 & 256  & ae-x25519 \\
 \end{center}
 \end{table}
 
-\jp{TODO: ae-x25519}
-
-\jp{TODO: Define updated types, how to derive symmetric keys. }
-
-
 \begin{lstlisting}
 type PKAEncPublicKey = {
     "public_key" : EncPublicKey
@@ -639,12 +634,12 @@ The PSF encoding for ciphertexts (\texttt{Encrypted a}) is the encrypted 512 bit
 \section{Cryptographic Identities}
 \label{sec:identities}
 
-\todo{update text to mention identities}
 
-\pkap{} distributes keys using a recursive, self-signing public key infrastructure. 
+\pkap{} cryptographic identities distribute keys using a recursive, self-signing public key infrastructure. 
 Specifically, a recursive tree structure (with type \texttt{PKASigned PKATree}) grants access to child entities and provides the public keys of entities in the tree. 
 These public keys are used for authentication, encryption, and digital signatures. 
 The recursive tree structure is encoded in JSON with type \texttt{PKASigned PKATree} in a file (with extension \texttt{.pkt} by convention). 
+Identities are self-signing since each node has a master key which is used to sign that node. 
 
 The definition of type \texttt{PKATree} is shown in \Cref{code:pkatree}. 
 \texttt{PKATree} is a record type that consists of keys \texttt{authentication}, \texttt{signature}, \texttt{encryption}, \texttt{children}, \texttt{master}, \texttt{ttl}, \texttt{expiration}, and \texttt{updated}. 
@@ -664,21 +659,20 @@ The definition of type \texttt{PKATree} is shown in \Cref{code:pkatree}.
 %This record is for a leaf node. 
 %\texttt{master}, \texttt{ttl}, \texttt{expiration}, and \texttt{updated} are the same as in the first record. 
 
-\todo{Add expiration to PKAChild?}
-
 Type \texttt{PKAChild} is a record that describes meta data about a child node. 
 \texttt{key} is the master key of the child node. 
 \texttt{location} is URL reference to the child node's JSON encoded \texttt{PKASigned PKATree} (or \texttt{.pkt} file). 
 \texttt{roles} grants additional privileges to the child node. 
+\texttt{expiration} is an optional date-time field of when delegation to the child expires. 
 \texttt{depth} is an optional attribute that indicates the maximum depth of the child's tree to limit further delegation. 
 For instance, a \texttt{depth} of 0 means that the child node cannot have children, while a \texttt{depth} of 1 means the child node can have children, but no grandchildren. 
 
-\jp{Support individual keys/groups expiring? For example, guests have access to IOT (door locks, lights, TV, etc) for a set amount of time.}
+% \jp{Support individual keys/groups expiring? For example, guests have access to IOT (door locks, lights, TV, etc) for a set amount of time.}
 
 % When \texttt{true}, \texttt{leaf} indicates that the child node must be a leaf record to prevent further delegation. 
 
 Type \texttt{PKARole} is an enum of strings. 
-The only currently valid strings are \texttt{"admin"}, \texttt{"auth"}, \texttt{"write"}, and \texttt{"read"}. 
+The only currently valid strings are \texttt{"admin"}, \texttt{"write"}, and \texttt{"read"}. % , and \texttt{"read"}. 
 
 Type \texttt{URL a} is a URL string that references a JSON encoded object of type \texttt{a}. 
 
@@ -706,6 +700,7 @@ type PKAChild = {
     "key" : PKAAuthPublicKey
   , "location" : URL (PKASigned PKATree)
   , "roles" : [PKARole]
+  , "expiration" : Maybe DateTime
   , "depth" : Maybe Int
 }
 
@@ -716,6 +711,8 @@ type URL a = String
 \caption{Definition of type \texttt{PKATree}.}
 \label{code:pkatree}
 \end{figure}
+% | "auth"
+
 % "leaf" : Bool -- TODO: 
 
 %\begin{figure}[h!]
@@ -869,8 +866,8 @@ In addition, the client and service MUST agree upon a unique \username{} that id
 \subsection{\pkap{} for Websites}
 
 While the \pkap{} authentication protocol can be used over any secure channel, special considerations must be taken into account when authenticating over \texttt{https} in the browser. 
-In particular, \pkap{} compliant websites MUST embed the html header tag \texttt{pkauth}. 
-The \texttt{pkauth} tag MUST always contain the attributes \texttt{href} and \texttt{token}. 
+In particular, \pkap{} compliant websites MUST embed the html header tag \texttt{pkap}. 
+The \texttt{pkap} tag MUST always contain the attributes \texttt{href} and \texttt{token}. 
 The \texttt{href} attribute MUST point to a URL on the same domain of the current webpage that will handle \pkap{} requests. 
 This URL is referred to as \texttt{authUrl}. 
 The \texttt{token} attribute MUST be a random sequence of characters to prevent CSRF attacks. % TODO: RFC for CSRF tokens??
@@ -879,18 +876,18 @@ If the user is logged into the website, the \texttt{authenticated} attribute MUS
 % If the website does not know the user's master public key and \texttt{PKASigned PKATree} URL, the \texttt{pkinfo} attribute MUST be included where the value is an empty string (\texttt{""}). 
 If the website knows the user's master public key and \texttt{PKASigned PKATree} URL, the \texttt{pkinfo} attribute MUST be included where the value is the identifier of the user's master public key. \todo{texttt for identifier?}
 %an empty string (\texttt{""}). 
-Examples of \texttt{pkauth} tags are shown in \Cref{example:pkauthtag}. 
+Examples of \texttt{pkap} tags are shown in \Cref{example:pkaptag}. 
 
 \begin{figure}[h!]
 \begin{lstlisting}
-<pkauth href="https://domain.name/pkauth" token="95eYX2IN" />
-<pkauth href="https://domain.name/pkauth" token="95eYX2IN" 
+<pkap href="https://domain.name/pkap" token="95eYX2IN" />
+<pkap href="https://domain.name/pkap" token="95eYX2IN" 
         authenticated="user63" />
-<pkauth href="https://domain.name/pkauth" token="95eYX2IN" 
+<pkap href="https://domain.name/pkap" token="95eYX2IN" 
         authenticated="user63" pkinfo="MiD7NiyZrhj4qF69C..." />
 \end{lstlisting}
-\caption{Example \texttt{pkauth} html header tags.}
-\label{example:pkauthtag}
+\caption{Example \texttt{pkap} html header tags.}
+\label{example:pkaptag}
 \end{figure}
 
 % Login
@@ -970,7 +967,7 @@ The client MUST also check that the \texttt{service\_identifier} matches the ser
 By default this period is two minutes. 
 If any of these checks fail, the client MAY restart the authentication process by sending another \texttt{initiate} request or MAY stop the authentication attempt. 
 Upon success, the client MAY continue the process by digitally signing the \texttt{PKAMac PKAChallenge}, producing a \texttt{PKASigned (PKAMac PKAChallenge)}. 
-The client provides the service the digitally signed challenge by sending a POST request to the \texttt{authUrl} where key \texttt{verb} has value \texttt{authenticate}, key \texttt{token} is the token provided by the pkauth header, and key \texttt{challenge} is the JSON encoded \texttt{PKASigned (PKAMac PKAChallenge)}. 
+The client provides the service the digitally signed challenge by sending a POST request to the \texttt{authUrl} where key \texttt{verb} has value \texttt{authenticate}, key \texttt{token} is the token provided by the pkap header, and key \texttt{challenge} is the JSON encoded \texttt{PKASigned (PKAMac PKAChallenge)}. 
 An example of a JSON encoded \texttt{PKASigned (PKAMac PKAChallenge)} is shown in \Cref{code:pkasignedmacchallenge}. 
 An example of the authenticating POST request is shown in \Cref{code:postauthenticate}. 
 
@@ -1009,7 +1006,7 @@ The service MAY redirect the client using JSON as shown in \Cref{fig:logout_redi
 \subsubsection{Logout}
 
 When the client wishes to logout, it checks the domain of the \texttt{authUrl}. 
-Then the client sends the service an AJAX POST request where the \texttt{verb} key is \texttt{logout} and the \texttt{token} key is the token provided by the \texttt{pkauth} html header tag. 
+Then the client sends the service an AJAX POST request where the \texttt{verb} key is \texttt{logout} and the \texttt{token} key is the token provided by the \texttt{pkap} html header tag. 
 \Cref{fig:logout_req} shows an example of this. 
 After verifying the token, the service can log out the client as usual. 
 Typically the service does this by revoking browser cookies and redirecting. 
@@ -1041,7 +1038,7 @@ token: 95eYX2IN
 % Share pkinfo
 \subsubsection{Establish Public Key Information}
 
-When the user is logged in and the service does not know the user's master public key, the \texttt{pkauth} tag includes the \texttt{pkinfo} attribute. 
+When the user is logged in and the service does not know the user's master public key, the \texttt{pkap} tag includes the \texttt{pkinfo} attribute. 
 In this circumstance, the client MAY establish the user's master public key and \texttt{PKASigned PKATree} URL with the service. 
 The client does this by first verifying the domain of \texttt{authUrl}.
 It then sends an AJAX POST request to \texttt{authUrl} where the \texttt{verb} key is the constant \texttt{pkinfo}, the \texttt{token} key is the CSRF token, the \texttt{username} key is the user's username, the \texttt{pkurl} key is the user's \texttt{PKASigned PKATree} URL, and the \texttt{pkmaster} key is the user's master public key. 
