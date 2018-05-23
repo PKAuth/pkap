@@ -854,8 +854,6 @@ type PKALink = {
 \section{\pkap{} API}
 \label{sec:pkap}
 
-\todo{Update...}
-
 \pkap{} is a public key authentication protocol used to authenticate end users. 
 The protocol requires that the client and service MUST establish a secure channel where the service's identity is authenticated. % TODO: define what  a secure channel is?? 
 It also requires that the service's internal clock time MUST be monotonic and have integrity. % TODO: clarify this? 
@@ -874,7 +872,7 @@ The \texttt{token} attribute MUST be a random sequence of characters to prevent 
 If the user is not logged into the website, \texttt{href} and \texttt{token} are the only required attributes. 
 If the user is logged into the website, the \texttt{authenticated} attribute MUST be included where the value is the user's username. 
 % If the website does not know the user's master public key and \texttt{PKASigned PKATree} URL, the \texttt{pkinfo} attribute MUST be included where the value is an empty string (\texttt{""}). 
-If the website knows the user's master public key and \texttt{PKASigned PKATree} URL, the \texttt{pkinfo} attribute MUST be included where the value is the identifier of the user's master public key. \todo{texttt for identifier?}
+If the website knows the user's master public key and \texttt{PKASigned PKATree} URL, the \texttt{pkinfo} attribute MUST be included where the value is the identifier (\texttt{PKAIdentifier}) of the user's master public key. 
 %an empty string (\texttt{""}). 
 Examples of \texttt{pkap} tags are shown in \Cref{example:pkaptag}. 
 
@@ -916,7 +914,7 @@ It is a failure if the public key is not in the \texttt{tree\_path} of the PKATr
 The service MUST generate a uniformly random nonce with a length of at least 64 bits. 
 The service MUST also get the current time. 
 Using this information, the service MUST create a \texttt{PKAChallenge} (defined in \Cref{code:pkachallenge} and a JSON encoded example is in \Cref{code:pkachallengejson}). 
-The service MUST then authenticate the challenge using a MAC, and the MAC key used SHOULD be unique for each user. 
+The service MUST then authenticate the challenge using a MAC, and the MAC key used MAY be unique for each user. 
 The service MUST return the JSON encoded \texttt{PKAMac PKAChallenge} in a \texttt{200 Success} response. 
 An example of a JSON encoded \texttt{PKAMac PKAChallenge} is shown in \Cref{code:pkamacchallenge}. 
 For added security, the service MAY store the nonce internally to protect against replay attacks that occur before the challenge expires. 
@@ -971,8 +969,6 @@ The client provides the service the digitally signed challenge by sending a POST
 An example of a JSON encoded \texttt{PKASigned (PKAMac PKAChallenge)} is shown in \Cref{code:pkasignedmacchallenge}. 
 An example of the authenticating POST request is shown in \Cref{code:postauthenticate}. 
 
-\todo{JP: Is this token removed now?}
-
 \begin{figure}
 \begin{lstlisting}
 verb: authenticate
@@ -988,7 +984,7 @@ challenge: {
 \label{code:postauthenticate}
 \end{figure}
 
-When the service receives the \texttt{authenticate} request, it MUST check that the username exists and that the public key used to sign the challenge belongs to the user being authenticated. 
+When the service receives the \texttt{authenticate} request, it MUST check that the username exists, that the \texttt{token} key is the token provided by the \pkap{} html header tag,  and that the public key used to sign the challenge belongs to the user being authenticated. 
 The service MUST also check that the \texttt{service\_identifier} matches the service's domain name. 
 The service MUST check that the \texttt{timestamp} is within a relatively recent period of time. 
 By default this period is two minutes. 
@@ -996,10 +992,11 @@ If the service previously stored nonce internally, the service MUST check that t
 The service MUST verify the MAC integrity of the challenge (\texttt{PKAMac PKAChallenge}). 
 The service MUST verify the integrity of the digitally signed challenge (\texttt{PKASigned (PKAMac PKAChallenge)}). 
 On any failure, the service MUST return a \texttt{404 Not Found} response. 
-Otherwise, the client’s identity is now confirmed so the service can authorize the user as usual. 
+Otherwise, the client's identity is now confirmed so the service can authorize the user as usual. 
 Typically, this involves setting browser cookies and redirecting the client. 
 The service MAY redirect the client using JSON as shown in \Cref{fig:logout_redirect}. 
 
+\todo{Consider including "extra" key for Applications.}
 % TODO: establish PKInfo, traverse PKLinks??
 
 % Logout
