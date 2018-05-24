@@ -918,8 +918,7 @@ The service MUST then authenticate the challenge using a MAC, and the MAC key us
 The service MUST return the JSON encoded \texttt{PKAMac PKAChallenge} in a \texttt{200 Success} response. 
 An example of a JSON encoded \texttt{PKAMac PKAChallenge} is shown in \Cref{code:pkamacchallenge}. 
 For added security, the service MAY store the nonce internally to protect against replay attacks that occur before the challenge expires. 
-On any failure, the service MUST return a \texttt{404 Not Found} response. 
-\todo{error codes table}
+On any failure, the service MUST return a \texttt{400 Bad Request} response with content of a JSON encoded \texttt{PKAError} (\Cref{code:pkaerror}). 
 
 \begin{figure}
 \begin{lstlisting}
@@ -939,7 +938,35 @@ type PKAChallenge = {
 \label{code:pkachallenge}
 \end{figure}
 
-\todo{JP: Mention optional ExternalChallenge. Defer/reference later section.}
+\begin{figure}
+\begin{lstlisting}
+type PKAError = {
+    "error": ErrorCode
+}
+\end{lstlisting}
+\begin{tabular}{| l | p{14cm} |}
+\hline
+\texttt{ErrorCode} & Description \\
+\hline
+0 & General error \\
+1 & Invalid token \\
+2 & Invalid verb \\
+3 & Invalid parameters (missing or improperly encoded parameters) \\
+4 & Invalid public key (no cryptographic identity for user or supplied public key is not in the cryptographic identity) \\
+5 & Cryptographic identity expired \\
+6 & Challenge expired \\
+7 & Invalid challenge (nonce is wrong, domain name is wrong, signed challenge is not verified) \\
+8 & Rate limit timeout \\
+\hline
+\end{tabular}
+\caption{Definition of a \texttt{PKAError}. \texttt{ErrorCode} is an integer error code that details what error occurred.}
+\label{code:pkaerror}
+\end{figure}
+
+
+
+
+%%% \todo{JP: Mention optional ExternalChallenge. Defer/reference later section.}
 
 \begin{figure}
 \begin{lstlisting}
@@ -991,12 +1018,12 @@ By default this period is two minutes.
 If the service previously stored nonce internally, the service MUST check that the nonce for that user is equal, and it MUST revoke the given nonce. 
 The service MUST verify the MAC integrity of the challenge (\texttt{PKAMac PKAChallenge}). 
 The service MUST verify the integrity of the digitally signed challenge (\texttt{PKASigned (PKAMac PKAChallenge)}). 
-On any failure, the service MUST return a \texttt{404 Not Found} response. 
+On any failure, the service MUST return a \texttt{400 Bad Request} response with content of a JSON encoded \texttt{PKAError} (\Cref{code:pkaerror}). 
 Otherwise, the client's identity is now confirmed so the service can authorize the user as usual. 
 Typically, this involves setting browser cookies and redirecting the client. 
 The service MAY redirect the client using JSON as shown in \Cref{fig:logout_redirect}. 
 
-\todo{Consider including "extra" key for Applications.}
+\todo{Should this be defined as a type? Require "success"? Consider including "extra" key for Applications.}
 % TODO: establish PKInfo, traverse PKLinks??
 
 % Logout
@@ -1041,6 +1068,7 @@ The client does this by first verifying the domain of \texttt{authUrl}.
 It then sends an AJAX POST request to \texttt{authUrl} where the \texttt{verb} key is the constant \texttt{pkinfo}, the \texttt{token} key is the CSRF token, the \texttt{username} key is the user's username, the \texttt{pkurl} key is the user's \texttt{PKASigned PKATree} URL, and the \texttt{pkmaster} key is the user's master public key. 
 % and the \texttt{pkinfo} key is the user's JSON encoded \texttt{PKALink}. 
 An example is shown in \Cref{example:establish:pkinfo}. 
+On any failure, the service MAY return a \texttt{400 Bad Request} response with content of a JSON encoded \texttt{PKAError} (\Cref{code:pkaerror}). 
 
 \begin{figure}
 \begin{lstlisting}
