@@ -38,7 +38,7 @@
 
 \author{James Parker\thanks{\texttt{jp@pkauth.com}}}
 \affil{PKAuth, LLC}
-\date{\today\\ \ \\ v0.0}
+\date{\today\\ \ \\ v0.0\footnote{Working draft}}
 
 
 \maketitle
@@ -1021,9 +1021,34 @@ The service MUST verify the integrity of the digitally signed challenge (\texttt
 On any failure, the service MUST return a \texttt{400 Bad Request} response with content of a JSON encoded \texttt{PKAError} (\Cref{code:pkaerror}). 
 Otherwise, the client's identity is now confirmed so the service can authorize the user as usual. 
 Typically, this involves setting browser cookies and redirecting the client. 
-The service MAY redirect the client using JSON as shown in \Cref{fig:logout_redirect}. 
+The service MAY redirect the client by returning content of a JSON encoded \texttt{PKAResponse}. 
 
-\todo{Should this be defined as a type? Require "success"? Consider including "extra" key for Applications.}
+\begin{figure}
+\begin{lstlisting}
+type PKAResponse = {
+    "success" : Bool
+  , "redirect" : Maybe URL
+  , "extra" : Maybe JSON
+}
+\end{lstlisting}
+\caption{Definition of a \texttt{PKAResponse}.}
+\label{code:pkaresponse}
+\end{figure}
+% JP: Cheating with the URL type
+
+
+
+The definition of type \texttt{PKAResponse} is shown in \Cref{code:pkaresponse}. 
+\texttt{PKAResponse} is a record type that consists of keys \texttt{success}, \texttt{redirect}, and \texttt{extra}. 
+% sum type of either a parent node in the tree or a leaf node. 
+% The first record in the \texttt{PKATree} type consists of the keys \texttt{children}, \texttt{master}, \texttt{ttl}, \texttt{expiration}, and \texttt{updated}. 
+% This record is for a parent node. 
+\texttt{success} is a boolean that indicates the success of a request. 
+\texttt{redirect} is an optional URL to redirect the client to. 
+\texttt{extra} is an optional field of any JSON value that may be application specific. 
+An example with a redirect field is shown in \Cref{fig:logout_redirect}. 
+
+% \todo{Should this be defined as a type? Require "success"? Consider including "extra" key for Applications.}
 % TODO: establish PKInfo, traverse PKLinks??
 
 % Logout
@@ -1034,18 +1059,10 @@ Then the client sends the service an AJAX POST request where the \texttt{verb} k
 \Cref{fig:logout_req} shows an example of this. 
 After verifying the token, the service can log out the client as usual. 
 Typically the service does this by revoking browser cookies and redirecting. 
-The service MAY indicate a browser redirect to the client over AJAX by returning JSON as shown in \Cref{fig:logout_redirect}. 
+The service MAY return content of type \texttt{PKAResponse} (\Cref{code:pkaresponse}). 
+% indicate a browser redirect to the client over AJAX by returning JSON as shown in \Cref{fig:logout_redirect}. 
 
-\todo{Should this be defined as a type? Require "success"? Consider including "extra" key for Applications.}
-
-\begin{figure}
-\begin{lstlisting}
-verb: logout
-token: 95eYX2IN
-\end{lstlisting}
-\caption{An example of a logout AJAX POST request.}
-\label{fig:logout_req}
-\end{figure}
+% \todo{Should this be defined as a type? Require "success"? Consider including "extra" key for Applications.}
 
 \begin{figure}
 \begin{lstlisting}
@@ -1058,6 +1075,14 @@ token: 95eYX2IN
 \label{fig:logout_redirect}
 \end{figure}
 
+\begin{figure}
+\begin{lstlisting}
+verb: logout
+token: 95eYX2IN
+\end{lstlisting}
+\caption{An example of a logout AJAX POST request.}
+\label{fig:logout_req}
+\end{figure}
 
 % Share pkinfo
 \subsubsection{Establish Public Key Information}
