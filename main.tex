@@ -942,6 +942,7 @@ type PKAChallenge = {
 \begin{lstlisting}
 type PKAError = {
     "error": ErrorCode
+  , "success": Bool
 }
 \end{lstlisting}
 \begin{tabular}{| l | p{14cm} |}
@@ -959,7 +960,7 @@ type PKAError = {
 8 & Rate limit timeout \\
 \hline
 \end{tabular}
-\caption{Definition of a \texttt{PKAError}. \texttt{ErrorCode} is an integer error code that details what error occurred.}
+\caption{Definition of a \texttt{PKAError}. \texttt{ErrorCode} is an integer error code that details what error occurred. The \texttt{success} key is a boolean set to \texttt{false}.}
 \label{code:pkaerror}
 \end{figure}
 
