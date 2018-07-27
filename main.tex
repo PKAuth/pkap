@@ -954,10 +954,12 @@ type PKAError = {
 2 & Invalid verb \\
 3 & Invalid parameters (missing or improperly encoded parameters) \\
 4 & Cryptographic identity expired \\
-5 & Invalid public key (no cryptographic identity for user or supplied public key is not in the cryptographic identity) \\
-6 & Challenge expired \\
-7 & Invalid challenge (nonce is wrong, domain name is wrong, signed challenge is not verified) \\
-8 & Rate limit timeout \\
+5 & Could not verify identity \\
+6 & Invalid identity (no cryptographic identity for user or supplied public key is not valid) \\
+% 6 & Invalid public key (no cryptographic identity for user or supplied public key is not in the cryptographic identity) \\
+7 & Challenge expired \\
+8 & Invalid challenge (nonce is wrong, domain name is wrong, signed challenge is not verified) \\
+9 & Rate limit timeout \\
 \hline
 \end{tabular}
 \caption{Definition of a \texttt{PKAError}. \texttt{ErrorCode} is an integer error code that details what error occurred. The \texttt{success} key is a boolean set to \texttt{false}.}
