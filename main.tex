@@ -193,9 +193,9 @@ type PKAMac a = {
     "content" : a
   , "tag" : MacTag
   , "algorithm" : PKAAlgorithm
-  , "identifier" : PKAIdentifier
 }
 \end{lstlisting}
+%  , "identifier" : PKAIdentifier
 
 \texttt{PKAMac a} is the record type used to encode symmetrically authenticated messages. 
 The key \texttt{content} holds the Base64Url encoded message. 
@@ -203,11 +203,13 @@ Any content of type \texttt{a} can be authenticated as long as \texttt{a} is enc
 Unless otherwise specified, this specification's default binary encoding is JSON. 
 The \texttt{tag} key is the Base64Url encoding of the PSF encoded MAC tag, where the PSF encoding is dependent on the algorithm used. 
 The key \texttt{algorithm} is the identifier of the symmetric authentication algorithm used. 
-The key \texttt{identifier} is the unique identifier of the secret key used to authenticate the message. 
+% The key \texttt{identifier} is the unique identifier of the secret key used to authenticate the message. 
 
-When verifying a \texttt{PKAMac}, one MUST verify that the algorithm of the secret key matches the algorithm in the \texttt{PKAMac}, the secret key's identifier matches the identifier in the \texttt{PKAMac}, and the tag is valid. 
+When verifying a \texttt{PKAMac}, one MUST verify that the algorithm of the secret key matches the algorithm in the \texttt{PKAMac}
+%, the secret key's identifier matches the identifier in the \texttt{PKAMac}
+, and the tag is valid. 
 
-\jp{Should the identifier be optional? Is it needed/useful?}
+% \jp{Should the identifier be optional? Is it needed/useful?}
 
 \subsubsection{HMAC with SHA256}
 
@@ -232,13 +234,13 @@ The secret key identifier (\texttt{PKAIdentifier}) for HMAC with SHA256 is the o
 \begin{lstlisting}
 {
     "tag":"CHGpaQxpbsJR5dipozuDPqtaz1Vt3T61MNkoRulRalA=",
-    "identifier":"N2zo2ur8NNbVcT1hpXmSps3vaxUxwuPBp",
     "content":"eyJ1c2VybmFtZSI6ImpwIiwic2VydmljZV9pZ...",
     "algorithm":"sa-hmacsha256"
 }
 \end{lstlisting}
 \caption{JSON encoded \texttt{PKAMac PKAChallenge}.}
 \label{code:pkamacchallenge}
+%    "identifier":"N2zo2ur8NNbVcT1hpXmSps3vaxUxwuPBp",
 \end{figure}
 
 
@@ -278,15 +280,17 @@ type PKAEncSecretKey = {
 \begin{lstlisting}
 type PKASymEncrypted a = {
     "ciphertext" : SymEncrypted a
-  , "identifier" : PKAIdentifier
   , "algorithm" : PKAAlgorithm
 }
 \end{lstlisting}
+%  , "identifier" : PKAIdentifier
 
 \label{type-PKASymEncrypted}
-\texttt{PKASymEncrypted} is the record type used to encode data encrypted using symmetric encryption. The \texttt{ciphertext} key holds the Base64Url encoding of the PSF encoded cipthertext. Any content of type a can be encrypted as long as \texttt{a} is encodable in binary. Unless otherwise specified, this specification's default binary encoding is JSON. The key \texttt{algorithm} states which symmetric encryption algorithm was used. The key \texttt{identifier} is the unique identifier of the secret key used to encrypt the content. 
+\texttt{PKASymEncrypted} is the record type used to encode data encrypted using symmetric encryption. The \texttt{ciphertext} key holds the Base64Url encoding of the PSF encoded cipthertext. Any content of type a can be encrypted as long as \texttt{a} is encodable in binary. Unless otherwise specified, this specification's default binary encoding is JSON. The key \texttt{algorithm} states which symmetric encryption algorithm was used. 
+%The key \texttt{identifier} is the unique identifier of the secret key used to encrypt the content. 
 
-When decrypting a \texttt{PKASymEncrypted}, one MUST verify that the algorithm in the secret key, \texttt{PKAEncSecretKey}, matches the algorithm in the \texttt{PKASymEncrypted a} and the key's identifier matches the identifier in the \texttt{PKASymEncrypted a}. 
+When decrypting a \texttt{PKASymEncrypted}, one MUST verify that the algorithm in the secret key, \texttt{PKAEncSecretKey}, matches the algorithm in the \texttt{PKASymEncrypted a}.
+% and the key's identifier matches the identifier in the \texttt{PKASymEncrypted a}. 
 
 Each algorithm has a standard key derivation function (\texttt{PKAKDF}) that produces a symmetric encryption key with inputs of a password, salt, and number of iterations. 
 
@@ -345,6 +349,7 @@ type PKAAuthPublicKey = {
 \texttt{PKAAuthPublicKey} is the record type used to encode asymmetric authentication public keys. 
 The \texttt{algorithm} key states which asymmetric authentication algorithm the key corresponds to. 
 The \texttt{public\_key} key is the Base64Url encoding of the PSF encoded public key, where the PSF encoding is dependent on the algorithm used. 
+% The public key identifier (\texttt{PKAIdentifier})
 
 \begin{lstlisting}
 type PKAAuthPrivateKey = {
@@ -362,9 +367,9 @@ type PKASigned a = {
     "content" : a
   , "signature" : Signature
   , "algorithm" : PKAAlgorithm
-  , "identifier" : PKAIdentifier
 }
 \end{lstlisting}
+%  , "identifier" : PKAIdentifier
 
 \texttt{PKASigned a} is the record type used to encode asymmetrically authenticated messages. 
 The \texttt{content} key holds the Base64Url encoded message. 
@@ -372,21 +377,23 @@ Any content of type \texttt{a} can be digitally signed as long as \texttt{a} is 
 Unless otherwise specified, this specification's default binary encoding is JSON. 
 The key \texttt{signature} is the Base64Url encoding of the PSF encoded digital signature, which is dependent on the algorithm used.  
 The \texttt{algorithm} key states which asymmetric authentication algorithm the key is for. 
-The key \texttt{identifier} is the unique identifier of the key pair used to sign the content (Corresponding public and private keys always share the same identifier). 
+% The key \texttt{identifier} is the unique identifier of the key pair used to sign the content (Corresponding public and private keys always share the same identifier). 
 
-When verifying a \texttt{PKASigned a},  one MUST verify that the algorithm of the public key matches the algorithm in the \texttt{PKASigned a}, the key's identifier matches the identifier in the \texttt{PKAMac}, and the signature is valid. 
+When verifying a \texttt{PKASigned a}, one MUST verify that the algorithm of the public key matches the algorithm in the \texttt{PKASigned a}
+% , the key's identifier matches the identifier in the \texttt{PKAMac}, 
+and the signature is valid. 
 
 \begin{figure}
 \begin{lstlisting}
 {
-    "algorithm":"aa-ed25519",
-    "signature":"GicCpubKVNbbVqOng9_g2_dd-...",
-    "identifier":"54tNxiGsBYMWCjb3rqUUvyTYk4mA62UXS",
-    "content":"eyJ0YWciOiJDSEdwYVF4cGJz..."
+    "algorithm":"aa-ed25519"
+  , "signature":"GicCpubKVNbbVqOng9_g2_dd-..."
+  , "content":"eyJ0YWciOiJDSEdwYVF4cGJz..."
 }
 \end{lstlisting}
 \caption{JSON encoded \texttt{PKASigned (PKAMac PKAChallenge)}.}
 \label{code:pkasignedmacchallenge}
+%    "identifier":"54tNxiGsBYMWCjb3rqUUvyTYk4mA62UXS",
 \end{figure}
 
 \subsubsection{ED25519}
@@ -547,8 +554,8 @@ The \texttt{keys} key contains a dictionary of public key identifiers to asymmet
 %Unless otherwise specified, this specification's default binary encoding is JSON. 
 %The \texttt{symmetric\_keys} key contains the symmetric secret keys as type \texttt{[PKAAsymEncryptedKey]}. 
 
-When decrypting a \texttt{PKAAsymEncrypted512}, one MUST verify that the algorithm of the public key matches the \texttt{algorithm} % in the \texttt{PKAAsymEncryptedKey} 
-and the key's identifier matches the identifier from \texttt{keys}. 
+When decrypting a \texttt{PKAAsymEncrypted512}, one MUST verify that the algorithm of the public key matches the \texttt{algorithm}. % in the \texttt{PKAAsymEncryptedKey} 
+% and the key's identifier matches the identifier from \texttt{keys}. 
 % in the \texttt{PKAAsymEncryptedKey}. 
 
 %
@@ -1006,12 +1013,12 @@ token: 95eYX2IN
 challenge: {
     "algorithm":"aa-ed25519",
     "signature":"GicCpubKVNbbVqOng9_g2_dd-...",
-    "identifier":"54tNxiGsBYMWCjb3rqUUvyTYk4mA62UXS",
     "content":"eyJ0YWciOiJDSEdwYVF4cGJz..."
 }
 \end{lstlisting}
 \caption{An example authenticating POST request.}
 \label{code:postauthenticate}
+%    "identifier":"54tNxiGsBYMWCjb3rqUUvyTYk4mA62UXS",
 \end{figure}
 
 When the service receives the \texttt{authenticate} request, it MUST check that the username exists, that the \texttt{token} key is the token provided by the \pkap{} html header tag,  and that the public key used to sign the challenge belongs to the user being authenticated. 
